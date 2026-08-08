@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nearby Rides — Mama Jaben?</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              ink: "#0D1420",
+              muted: "#5B6472",
+              card: "#FFFFFF",
+              emerald: { DEFAULT: "#0E7A5A", dark: "#0A5E45", deep: "#0B3B2C", light: "#E7F3EC", ring: "#BFDECC" },
+              clay: { DEFAULT: "#9C5A33", dark: "#7E4826", light: "#F3EAE1", ring: "#E1CBB4" },
+              hairline: "rgba(13,20,32,0.09)",
+            },
+            fontFamily: { display: ["Sora", "sans-serif"], body: ["Inter", "sans-serif"] },
+            boxShadow: {
+              soft: "0 1px 2px rgba(13,20,32,0.04), 0 10px 26px -14px rgba(13,20,32,0.22)",
+              softer: "0 1px 1px rgba(13,20,32,0.03), 0 2px 8px -3px rgba(13,20,32,0.08)",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      body { background: #f6f7f8; }
+      @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+      .pulse-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
+    </style>
+  </head>
+  <body class="font-body text-ink antialiased">
+    <div style="display:none">{% csrf_token %}</div>
+    <!-- ============ NAVBAR ============ -->
+    <header class="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-hairline">
+      <div class="max-w-3xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
+        <a href="{% url 'driver_dashboard' %}" class="flex items-center gap-2.5">
+          <span class="relative w-9 h-9 grid place-items-center rounded-lg bg-ink">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+              <path d="M12 22s7-7.58 7-12.5A7 7 0 0 0 5 9.5C5 14.42 12 22 12 22Z" fill="white" />
+              <circle cx="12" cy="9.5" r="2.6" fill="#0D1420" />
+            </svg>
+          </span>
+          <span class="font-display font-bold text-lg tracking-tight text-ink">Mama <span class="text-emerald">Jaben?</span></span>
+        </a>
+        <a href="{% url 'driver_dashboard' %}" class="text-sm font-semibold text-muted hover:text-ink">&larr; Dashboard</a>
+      </div>
+    </header>
+
+    <!-- ============ MESSAGES ============ -->
+    {% if messages %}
+    <div class="max-w-3xl mx-auto px-5 sm:px-8 pt-4">
+      {% for message in messages %}
+      <div
+        class="mb-3 px-4 py-3 rounded-lg text-sm font-medium border {% if message.tags == 'success' %}bg-emerald-light text-emerald-dark border-emerald-ring{% elif message.tags == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-clay-light text-clay-dark border-clay-ring{% endif %}"
+      >
+        {{ message }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <main class="max-w-3xl mx-auto px-5 sm:px-8 py-8 sm:py-10">
+      <div class="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 class="font-display font-bold text-2xl sm:text-3xl text-ink">Nearby Ride Requests</h1>
+          <p class="text-muted mt-1.5 text-sm">
+            Showing {{ vehicle_type }}{% if vehicle_capacity %} · {{ vehicle_capacity }}-seat{% endif %} requests near you.
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <select
+            id="radius-select"
+            class="border border-hairline rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-ring"
+          >
+            <option value="2">Within 2 km</option>
+            <option value="3" selected>Within 3 km</option>
+            <option value="5">Within 5 km</option>
+          </select>
+          <button
+            id="refresh-btn"
+            type="button"
+            title="Refresh now"
+            class="w-9 h-9 grid place-items-center rounded-lg border border-hairline text-muted hover:text-emerald-dark hover:border-emerald-ring transition-colors"
+          >
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M4 4v5h5M20 20v-5h-5M4.5 15a8 8 0 0 0 14.9 2.5M19.5 9A8 8 0 0 0 4.6 6.5"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div id="location-status" class="mt-4 flex items-center gap-2 text-xs font-semibold text-muted">
+        <span class="w-2 h-2 rounded-full bg-clay pulse-dot"></span>
+        <span id="location-status-text">Getting your location…</span>
+      </div>
+
+      <div id="rides-list" class="mt-5 space-y-3"></div>
+
+      <p id="list-loading" class="hidden text-sm text-muted text-center py-10">Loading nearby rides…</p>
+
+      <div id="empty-state" class="hidden text-center py-14 bg-card rounded-xl border border-hairline">
+        <p class="text-sm text-muted">No ride requests within range right now.</p>
+        <p class="text-xs text-muted mt-1">The list checks again automatically every 20 seconds.</p>
+      </div>
+
+      <p id="list-error" class="hidden text-sm text-red-600 text-center py-10"></p>
+    </main>
+
+    <script>
+      const NEARBY_RIDES_URL = "{% url 'nearby_rides' %}";
+      const ACCEPT_RIDE_BASE = "/driver/accept-ride/";
+      const CSRF_TOKEN = document.querySelector('[name=csrfmiddlewaretoken]') 
+        ? document.querySelector('[name=csrfmiddlewaretoken]').value
+        : getCookie('csrftoken');
+
+      function getCookie(name) {
+        const match = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+        return match ? match.pop() : '';
+      }
+
+      let driverLatLng = null;
+      let currentRadius = 3;
+      let refreshTimer = null;
+      let fetchInFlight = false;
+
+      function setLocationStatus(state, text) {
+        const dot = document.querySelector('#location-status span.w-2');
+        const label = document.getElementById('location-status-text');
+        label.textContent = text;
+        dot.className = 'w-2 h-2 rounded-full pulse-dot ' + (state === 'found' ? 'bg-emerald' : state === 'error' ? 'bg-red-500' : 'bg-clay');
+      }
+
+      function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str == null ? '' : str;
+        return div.innerHTML;
+      }
+
+      function startLocationWatch() {
+        if (!navigator.geolocation) {
+          setLocationStatus('error', 'Your browser does not support location access.');
+          showListError('Location access is required to find nearby rides.');
+          return;
+        }
+        navigator.geolocation.watchPosition(
+          (pos) => {
+            driverLatLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            setLocationStatus('found', 'Location found — list updates automatically.');
+            fetchNearbyRides();
+          },
+          () => {
+            setLocationStatus('error', 'Location access denied — allow it to see nearby rides.');
+          },
+          { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 }
+        );
+      }
+
+      function showListError(msg) {
+        document.getElementById('list-error').textContent = msg;
+        document.getElementById('list-error').classList.remove('hidden');
+        document.getElementById('rides-list').innerHTML = '';
+        document.getElementById('empty-state').classList.add('hidden');
+      }
+
+      async function fetchNearbyRides() {
+        if (!driverLatLng || fetchInFlight) return;
+        fetchInFlight = true;
+        document.getElementById('list-loading').classList.remove('hidden');
+        document.getElementById('list-error').classList.add('hidden');
+
+        try {
+          const url = `${NEARBY_RIDES_URL}?lat=${driverLatLng.lat}&lng=${driverLatLng.lng}&radius=${currentRadius}`;
+          const res = await fetch(url, { credentials: 'same-origin' });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Could not load nearby rides');
+          renderRides(data.rides);
+        } catch (err) {
+          showListError(err.message);
+        } finally {
+          document.getElementById('list-loading').classList.add('hidden');
+          fetchInFlight = false;
+        }
+      }
+
+      function renderRides(rides) {
+        const container = document.getElementById('rides-list');
+        const empty = document.getElementById('empty-state');
+        container.innerHTML = '';
+
+        if (!rides.length) {
+          empty.classList.remove('hidden');
+          return;
+        }
+        empty.classList.add('hidden');
+
+        rides.forEach((ride) => container.appendChild(buildRideCard(ride)));
+      }
+
+      function buildRideCard(ride) {
+        const card = document.createElement('div');
+        card.className = 'bg-card rounded-xl border border-hairline shadow-softer p-5';
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0">
+              <span class="inline-block text-[11px] font-semibold text-emerald-dark bg-emerald-light px-2 py-0.5 rounded-full">${ride.distance_km} km away</span>
+              <div class="flex items-start gap-3 mt-3">
+                <div class="mt-1.5 flex flex-col items-center">
+                  <span class="w-2 h-2 rounded-full bg-emerald shrink-0"></span>
+                  <span class="w-px h-5 bg-hairline"></span>
+                  <span class="w-2 h-2 rounded-full bg-clay shrink-0"></span>
+                </div>
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-ink truncate">${escapeHtml(ride.start_location)}</p>
+                  <p class="text-sm font-medium text-ink truncate mt-2.5">${escapeHtml(ride.end_location)}</p>
+                </div>
+              </div>
+              <p class="text-xs text-muted mt-2">${escapeHtml(ride.vehicle_type)}${ride.capacity ? ' · ' + ride.capacity + '-seat' : ''}${ride.time ? ' · ' + escapeHtml(ride.time) : ''}</p>
+            </div>
+            <p class="font-display font-bold text-lg text-ink shrink-0">${ride.estimated_fare != null ? '৳' + Math.round(ride.estimated_fare) : ''}</p>
+          </div>
+          <button type="button" class="accept-btn w-full mt-4 bg-ink hover:bg-emerald-deep text-white font-semibold text-sm px-4 py-2.5 rounded-lg transition-colors">
+            Accept Ride
+          </button>
+          <div class="accept-feedback"></div>
+        `;
+        card.querySelector('.accept-btn').addEventListener('click', (e) => acceptRide(ride.request_id, card, e.currentTarget));
+        return card;
+      }
+
+      async function acceptRide(requestId, card, button) {
+        button.disabled = true;
+        const originalText = button.textContent;
+        button.textContent = 'Accepting…';
+        const feedback = card.querySelector('.accept-feedback');
+        feedback.innerHTML = '';
+
+        try {
+          const res = await fetch(`${ACCEPT_RIDE_BASE}${requestId}/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF_TOKEN },
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Could not accept this ride');
+
+          card.innerHTML = '<p class="text-emerald-dark font-semibold text-sm text-center py-2">Accepted! Head to pickup.</p>';
+          setTimeout(() => {
+            card.remove();
+            fetchNearbyRides();
+          }, 1500);
+        } catch (err) {
+          button.disabled = false;
+          button.textContent = originalText;
+          feedback.innerHTML = `<p class="text-red-600 text-xs mt-2">${escapeHtml(err.message)}</p>`;
+          setTimeout(fetchNearbyRides, 1000);
+        }
+      }
+
+      document.getElementById('radius-select').addEventListener('change', (e) => {
+        currentRadius = parseFloat(e.target.value);
+        fetchNearbyRides();
+      });
+
+      document.getElementById('refresh-btn').addEventListener('click', fetchNearbyRides);
+
+      function startAutoRefresh() {
+        if (refreshTimer) clearInterval(refreshTimer);
+        refreshTimer = setInterval(() => {
+          if (driverLatLng) fetchNearbyRides();
+        }, 20000);
+      }
+
+      startLocationWatch();
+      startAutoRefresh();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Register Vehicle — Mama Jaben?</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              ink: "#0D1420",
+              muted: "#5B6472",
+              card: "#FFFFFF",
+              emerald: { DEFAULT: "#0E7A5A", dark: "#0A5E45", deep: "#0B3B2C", light: "#E7F3EC", ring: "#BFDECC" },
+              clay: { DEFAULT: "#9C5A33", dark: "#7E4826", light: "#F3EAE1", ring: "#E1CBB4" },
+              hairline: "rgba(13,20,32,0.09)",
+            },
+            fontFamily: { display: ["Sora", "sans-serif"], body: ["Inter", "sans-serif"] },
+            boxShadow: { soft: "0 1px 2px rgba(13,20,32,0.04), 0 10px 26px -14px rgba(13,20,32,0.22)", softer: "0 1px 1px rgba(13,20,32,0.03), 0 2px 8px -3px rgba(13,20,32,0.08)" },
+          },
+        },
+      };
+    </script>
+    <style>
+      body { background: #f6f7f8; }
+    </style>
+  </head>
+  <body class="font-body text-ink antialiased">
+    <header class="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-hairline">
+      <div class="max-w-2xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
+        <a href="{% url 'driver_dashboard' %}" class="flex items-center gap-2.5">
+          <span class="relative w-9 h-9 grid place-items-center rounded-lg bg-ink">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+              <path d="M12 22s7-7.58 7-12.5A7 7 0 0 0 5 9.5C5 14.42 12 22 12 22Z" fill="white" />
+              <circle cx="12" cy="9.5" r="2.6" fill="#0D1420" />
+            </svg>
+          </span>
+          <span class="font-display font-bold text-lg tracking-tight text-ink">Mama <span class="text-emerald">Jaben?</span></span>
+        </a>
+        <a href="{% url 'driver_dashboard' %}" class="text-sm font-semibold text-muted hover:text-ink">&larr; Dashboard</a>
+      </div>
+    </header>
+
+    {% if messages %}
+    <div class="max-w-2xl mx-auto px-5 sm:px-8 pt-4">
+      {% for message in messages %}
+      <div class="mb-3 px-4 py-3 rounded-lg text-sm font-medium border {% if message.tags == 'success' %}bg-emerald-light text-emerald-dark border-emerald-ring{% elif message.tags == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-clay-light text-clay-dark border-clay-ring{% endif %}">
+        {{ message }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <main class="max-w-2xl mx-auto px-5 sm:px-8 py-10">
+      <h1 class="font-display font-bold text-2xl text-ink">Register Your Vehicle</h1>
+      <p class="text-muted mt-1.5 text-sm">This gets sent to an admin for verification before you can accept rides.</p>
+
+      <form method="POST" enctype="multipart/form-data" class="mt-6 bg-card rounded-xl border border-hairline shadow-softer p-6 sm:p-7 space-y-5">
+        {% csrf_token %}
+
+        <div>
+          <label for="vehicle_license" class="text-sm font-semibold text-ink">Vehicle License / Registration No.</label>
+          <input
+            type="text"
+            id="vehicle_license"
+            name="vehicle_license"
+            required
+            class="mt-1.5 w-full border border-hairline rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-ring"
+          />
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label for="type" class="text-sm font-semibold text-ink">Vehicle Type</label>
+            <select
+              id="type"
+              name="type"
+              required
+              class="mt-1.5 w-full border border-hairline rounded-lg px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-ring"
+            >
+              <option value="Bike">Bike</option>
+              <option value="Car">Car</option>
+              <option value="CNG">CNG</option>
+            </select>
+          </div>
+          <div>
+            <label for="max_capacity" class="text-sm font-semibold text-ink">Passenger Capacity</label>
+            <input
+              type="number"
+              id="max_capacity"
+              name="max_capacity"
+              min="1"
+              max="8"
+              required
+              placeholder="e.g. 4"
+              class="mt-1.5 w-full border border-hairline rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-ring"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label for="veh_license_image" class="text-sm font-semibold text-ink">Vehicle License Photo</label>
+          <input
+            type="file"
+            id="veh_license_image"
+            name="veh_license_image"
+            accept="image/*"
+            class="mt-1.5 w-full text-sm text-muted file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-light file:text-emerald-dark hover:file:bg-emerald-ring/40"
+          />
+        </div>
+
+        <button
+          type="submit"
+          class="w-full bg-ink hover:bg-emerald-deep text-white font-semibold text-sm px-6 py-3.5 rounded-lg shadow-soft transition-colors"
+        >
+          Submit for Verification
+        </button>
+      </form>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,1415 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mama Jaben? — Book a Ride</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@600;700;800&family=JetBrains+Mono:wght@500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              canvas: "#F6F7F8",
+              panel: "#EFF1F3",
+              card: "#FFFFFF",
+              ink: "#0D1420",
+              muted: "#5B6472",
+              emerald: {
+                DEFAULT: "#0E7A5A",
+                dark: "#0A5E45",
+                deep: "#0B3B2C",
+                light: "#E7F3EC",
+                ring: "#BFDECC",
+              },
+              clay: {
+                DEFAULT: "#9C5A33",
+                dark: "#7E4826",
+                light: "#F3EAE1",
+                ring: "#E1CBB4",
+              },
+              hairline: "rgba(13,20,32,0.09)",
+            },
+            fontFamily: {
+              display: ["Sora", "sans-serif"],
+              body: ["Inter", "sans-serif"],
+              bn: ['"Noto Sans Bengali"', "sans-serif"],
+              mono: ['"JetBrains Mono"', "monospace"],
+            },
+            boxShadow: {
+              soft: "0 1px 2px rgba(13,20,32,0.04), 0 10px 26px -14px rgba(13,20,32,0.22)",
+              softer: "0 1px 1px rgba(13,20,32,0.03), 0 2px 8px -3px rgba(13,20,32,0.08)",
+              modal: "0 24px 60px -18px rgba(13,20,32,0.4)",
+              ticket: "0 1px 1px rgba(13,20,32,0.03), 0 20px 40px -20px rgba(13,20,32,0.28)",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      html,
+      body {
+        height: 100%;
+        overscroll-behavior: none;
+      }
+      body {
+        background: #f6f7f8;
+      }
+      ::selection {
+        background: #bfdecc;
+        color: #0d1420;
+      }
+      .eyebrow {
+        letter-spacing: 0.14em;
+      }
+      input:focus,
+      textarea:focus {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(14, 122, 90, 0.16);
+        border-color: #0e7a5a;
+      }
+      .drawer {
+        transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(13, 20, 32, 0.55);
+        backdrop-filter: blur(3px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 200;
+        padding: 1rem;
+      }
+      .modal-overlay.open {
+        display: flex;
+      }
+      .panel-view {
+        display: none;
+      }
+      .panel-view.active {
+        display: block;
+      }
+      .spinner {
+        border: 3px solid #e7f3ec;
+        border-top-color: #0e7a5a;
+        border-radius: 999px;
+        animation: spin 0.9s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .pulse-dot {
+        animation: pulseDot 1.4s ease-in-out infinite;
+      }
+      .pulse-dot:nth-child(2) {
+        animation-delay: 0.18s;
+      }
+      .pulse-dot:nth-child(3) {
+        animation-delay: 0.36s;
+      }
+      @keyframes pulseDot {
+        0%,
+        60%,
+        100% {
+          opacity: 0.25;
+          transform: translateY(0);
+        }
+        30% {
+          opacity: 1;
+          transform: translateY(-3px);
+        }
+      }
+      .ticket-tear {
+        border-top: 1.5px dashed rgba(13, 20, 32, 0.16);
+      }
+      .toast {
+        animation: toastIn 0.25s ease-out;
+      }
+      @keyframes toastIn {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .leaflet-div-icon {
+        background: transparent;
+        border: none;
+      }
+      .leaflet-control-zoom {
+        border: none !important;
+        box-shadow: 0 1px 2px rgba(13, 20, 32, 0.04), 0 10px 26px -14px rgba(13, 20, 32, 0.22) !important;
+      }
+      .star-btn {
+        transition: transform 0.12s ease;
+      }
+      .star-btn:hover {
+        transform: scale(1.12);
+      }
+      #map {
+        background: #eef0f3;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body class="font-body text-ink antialiased h-full overflow-hidden">
+    <div class="h-full w-full flex flex-col">
+      <!-- ============ TOP BAR ============ -->
+      <header
+        class="h-14 shrink-0 flex items-center justify-between px-4 sm:px-5 bg-white/95 backdrop-blur-md border-b border-hairline z-30"
+      >
+        <div class="flex items-center gap-2.5">
+          <span class="w-8 h-8 grid place-items-center rounded-lg bg-ink shrink-0">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+              <path d="M12 22s7-7.58 7-12.5A7 7 0 0 0 5 9.5C5 14.42 12 22 12 22Z" fill="white" />
+              <circle cx="12" cy="9.5" r="2.6" fill="#0D1420" />
+            </svg>
+          </span>
+          <span class="font-display font-bold text-base tracking-tight text-ink hidden xs:inline"
+            >Mama <span class="text-emerald">Jaben?</span></span
+          >
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span
+            id="statusPill"
+            class="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold text-muted bg-panel border border-hairline px-3 py-1.5 rounded-full"
+          >
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald"></span> Ready to ride
+          </span>
+          <button
+            onclick="openProfileDrawer()"
+            class="flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full border border-hairline hover:bg-panel transition-colors"
+          >
+            <span
+              class="w-7 h-7 rounded-full bg-emerald-light text-emerald-dark grid place-items-center text-xs font-bold font-display"
+              >NJ</span
+            >
+            <span class="text-sm font-semibold text-ink hidden sm:inline">Nusrat</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- ============ MAIN AREA: MAP + BOOKING PANEL ============ -->
+      <main class="relative flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
+        <div id="map" class="absolute inset-0 md:static md:flex-1 md:h-full z-0"></div>
+
+        <!-- BOOKING PANEL -->
+        <section
+          id="bookingPanel"
+          class="pointer-events-auto fixed md:static bottom-0 inset-x-0 md:inset-auto z-20 md:z-10 w-full md:w-[400px] lg:w-[440px] max-h-[72vh] md:max-h-none md:h-full bg-white border-t md:border-t-0 md:border-r border-hairline rounded-t-2xl md:rounded-none shadow-modal md:shadow-none overflow-y-auto"
+        >
+          <div class="md:hidden pt-2.5 pb-1 flex justify-center">
+            <span class="w-10 h-1.5 rounded-full bg-hairline"></span>
+          </div>
+
+          <div class="px-5 sm:px-6 pt-3 md:pt-6 pb-8">
+            <!-- ===== VIEW: BOOK ===== -->
+            <div id="view-book" class="panel-view active">
+              <h2 class="font-display font-bold text-xl text-ink">Where to, Mama?</h2>
+              <p class="text-sm text-muted mt-1">Set your route and pick a ride to see the fare.</p>
+
+              <!-- vehicle selector -->
+              <div class="mt-5 grid grid-cols-3 gap-2.5" id="vehicleSelector">
+                <button
+                  type="button"
+                  data-vehicle="bike"
+                  onclick="selectVehicle('bike')"
+                  class="vehicle-card text-left border rounded-xl p-3 transition-colors"
+                >
+                  <svg class="w-6 h-6 text-ink" viewBox="0 0 24 24" fill="none">
+                    <circle cx="5.5" cy="17.5" r="2.5" stroke="currentColor" stroke-width="2" />
+                    <circle cx="18.5" cy="17.5" r="2.5" stroke="currentColor" stroke-width="2" />
+                    <path
+                      d="M5.5 17.5 9 10h4l2 3h3.5M9 10 7 7h3"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  <p class="mt-2 text-sm font-semibold text-ink">Bike</p>
+                  <p class="text-[11px] text-muted">1 seat</p>
+                  <p class="text-[11px] font-mono text-muted mt-1">from ৳25</p>
+                </button>
+                <button
+                  type="button"
+                  data-vehicle="car4"
+                  onclick="selectVehicle('car4')"
+                  class="vehicle-card text-left border rounded-xl p-3 transition-colors"
+                >
+                  <svg class="w-6 h-6 text-ink" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M3 13l1.5-4.5A2 2 0 0 1 6.4 7h11.2a2 2 0 0 1 1.9 1.5L21 13"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <rect x="3" y="13" width="18" height="6" rx="1.6" stroke="currentColor" stroke-width="2" />
+                    <circle cx="7.5" cy="19" r="1.4" fill="currentColor" />
+                    <circle cx="16.5" cy="19" r="1.4" fill="currentColor" />
+                  </svg>
+                  <p class="mt-2 text-sm font-semibold text-ink">Car</p>
+                  <p class="text-[11px] text-muted">4 seats</p>
+                  <p class="text-[11px] font-mono text-muted mt-1">from ৳80</p>
+                </button>
+                <button
+                  type="button"
+                  data-vehicle="car6"
+                  onclick="selectVehicle('car6')"
+                  class="vehicle-card text-left border rounded-xl p-3 transition-colors"
+                >
+                  <svg class="w-6 h-6 text-ink" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M3 12V9a2 2 0 0 1 2-2h9l4 4v1"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <rect x="3" y="12" width="18" height="6" rx="1.6" stroke="currentColor" stroke-width="2" />
+                    <path d="M10 7v5" stroke="currentColor" stroke-width="2" />
+                    <circle cx="7.5" cy="18" r="1.4" fill="currentColor" />
+                    <circle cx="16.5" cy="18" r="1.4" fill="currentColor" />
+                  </svg>
+                  <p class="mt-2 text-sm font-semibold text-ink">Car XL</p>
+                  <p class="text-[11px] text-muted">6 seats</p>
+                  <p class="text-[11px] font-mono text-muted mt-1">from ৳120</p>
+                </button>
+              </div>
+
+              <!-- location pickers -->
+              <div class="mt-5 space-y-3">
+                <div class="relative border border-hairline rounded-xl p-3.5 bg-panel/60">
+                  <div class="flex items-center gap-2.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald shrink-0"></span>
+                    <div class="flex-1 min-w-0">
+                      <label for="pickupInput" class="block text-[10px] font-semibold text-muted uppercase eyebrow">Pickup</label>
+                      <input
+                        id="pickupInput"
+                        list="locationList"
+                        type="text"
+                        placeholder="Pick a spot or tap the map"
+                        class="w-full bg-transparent text-sm font-medium text-ink placeholder:text-muted placeholder:font-normal focus:shadow-none focus:border-transparent mt-0.5"
+                        onchange="handleLocationInput('pickup', this.value)"
+                      />
+                    </div>
+                    <button
+                      id="clearPickupBtn"
+                      type="button"
+                      onclick="clearPickup()"
+                      class="hidden w-6 h-6 shrink-0 grid place-items-center rounded-full hover:bg-white text-muted"
+                    >
+                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                        <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                      </svg>
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onclick="useCurrentLocation()"
+                    class="mt-2.5 inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-dark bg-emerald-light hover:bg-emerald-ring/50 px-2.5 py-1.5 rounded-lg transition-colors"
+                  >
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" />
+                      <path
+                        d="M12 2v3M12 19v3M2 12h3M19 12h3"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                      />
+                    </svg>
+                    Use current location
+                  </button>
+                </div>
+
+                <div class="relative border border-hairline rounded-xl p-3.5 bg-panel/60">
+                  <div class="flex items-center gap-2.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-clay shrink-0"></span>
+                    <div class="flex-1 min-w-0">
+                      <label for="destInput" class="block text-[10px] font-semibold text-muted uppercase eyebrow">Destination</label>
+                      <input
+                        id="destInput"
+                        list="locationList"
+                        type="text"
+                        placeholder="Pick a spot or tap the map"
+                        class="w-full bg-transparent text-sm font-medium text-ink placeholder:text-muted placeholder:font-normal mt-0.5"
+                        onchange="handleLocationInput('destination', this.value)"
+                      />
+                    </div>
+                    <button
+                      id="clearDestBtn"
+                      type="button"
+                      onclick="clearDestination()"
+                      class="hidden w-6 h-6 shrink-0 grid place-items-center rounded-full hover:bg-white text-muted"
+                    >
+                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                        <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                      </svg>
+                    </button>
+                  </div>
+                  <p class="mt-2 text-[11px] text-muted">Tip: tap the map to drop a pin for either field.</p>
+                </div>
+                <datalist id="locationList"></datalist>
+              </div>
+
+              <!-- coupon section -->
+              <div class="mt-5 border border-hairline rounded-xl p-3.5">
+                <div class="flex items-center justify-between gap-2">
+                  <label for="promoInput" class="text-xs font-semibold text-ink">Promo code</label>
+                  <button
+                    type="button"
+                    onclick="toggleCouponList()"
+                    class="text-[11px] font-semibold text-emerald-dark hover:underline"
+                  >
+                    View available coupons
+                  </button>
+                </div>
+                <div class="mt-2 flex gap-2">
+                  <input
+                    id="promoInput"
+                    type="text"
+                    placeholder="e.g. MAMA50"
+                    class="flex-1 min-w-0 px-3 py-2.5 rounded-lg border border-hairline text-sm placeholder:text-muted uppercase"
+                  />
+                  <button
+                    type="button"
+                    onclick="applyPromoFromInput()"
+                    class="px-4 py-2.5 rounded-lg bg-ink hover:bg-emerald-deep text-white text-sm font-semibold transition-colors"
+                  >
+                    Apply
+                  </button>
+                </div>
+                <div id="couponList" class="hidden mt-3 space-y-2"></div>
+                <div id="appliedCouponRow" class="hidden mt-3 flex items-center justify-between bg-emerald-light border border-emerald-ring rounded-lg px-3 py-2">
+                  <p class="text-xs font-semibold text-emerald-dark" id="appliedCouponLabel"></p>
+                  <button type="button" onclick="removeCoupon()" class="text-[11px] font-semibold text-emerald-dark hover:underline">
+                    Remove
+                  </button>
+                </div>
+              </div>
+
+              <!-- fare estimate -->
+              <div id="fareCard" class="hidden mt-5 border border-hairline rounded-xl p-4">
+                <p class="text-[11px] font-bold eyebrow text-muted uppercase">Fare estimate</p>
+                <div class="mt-2 flex items-center justify-between text-sm">
+                  <span class="text-muted">Distance</span>
+                  <span class="font-mono font-semibold text-ink" id="fareDistance">—</span>
+                </div>
+                <div class="mt-1.5 flex items-center justify-between text-sm">
+                  <span class="text-muted">Original fare</span>
+                  <span class="font-mono text-ink" id="fareOriginal">৳0</span>
+                </div>
+                <div id="fareDiscountRow" class="hidden mt-1.5 flex items-center justify-between text-sm">
+                  <span class="text-emerald-dark">Coupon discount</span>
+                  <span class="font-mono text-emerald-dark" id="fareDiscount">−৳0</span>
+                </div>
+                <div class="mt-2 pt-2 ticket-tear flex items-center justify-between">
+                  <span class="text-sm font-semibold text-ink">Final fare</span>
+                  <span class="font-display font-bold text-lg text-ink" id="fareFinal">৳0</span>
+                </div>
+              </div>
+
+              <button
+                id="requestRideBtn"
+                type="button"
+                onclick="requestRide()"
+                disabled
+                class="mt-6 w-full bg-ink text-white font-semibold text-sm py-3.5 rounded-xl transition-colors opacity-40 cursor-not-allowed"
+              >
+                Find a Mama
+              </button>
+            </div>
+
+            <!-- ===== VIEW: SEARCHING ===== -->
+            <div id="view-searching" class="panel-view">
+              <div class="flex flex-col items-center text-center py-10">
+                <div class="w-16 h-16 rounded-full spinner"></div>
+                <h3 class="mt-6 font-display font-bold text-lg text-ink">Searching nearest Mamas nearby…</h3>
+                <p class="mt-2 text-sm text-muted max-w-xs">
+                  Hang tight — we're matching you with a verified driver close to your pickup point.
+                </p>
+                <div class="mt-4 flex items-center gap-1.5">
+                  <span class="pulse-dot w-2 h-2 rounded-full bg-emerald"></span>
+                  <span class="pulse-dot w-2 h-2 rounded-full bg-emerald"></span>
+                  <span class="pulse-dot w-2 h-2 rounded-full bg-emerald"></span>
+                </div>
+                <button
+                  type="button"
+                  onclick="cancelRide()"
+                  class="mt-8 text-sm font-semibold text-muted hover:text-ink underline underline-offset-2"
+                >
+                  Cancel search
+                </button>
+              </div>
+            </div>
+
+            <!-- ===== VIEW: MATCHED ===== -->
+            <div id="view-matched" class="panel-view">
+              <p class="text-[11px] font-bold eyebrow text-clay-dark uppercase">Mama found</p>
+              <h3 class="mt-1 font-display font-bold text-lg text-ink">Your driver is on the way</h3>
+
+              <div class="mt-4 border border-hairline rounded-xl p-4">
+                <div class="flex items-center gap-3">
+                  <span
+                    id="driverAvatar"
+                    class="w-12 h-12 rounded-full bg-clay-light text-clay-dark grid place-items-center font-display font-bold shrink-0"
+                    >KM</span
+                  >
+                  <div class="min-w-0">
+                    <p class="font-display font-semibold text-ink" id="driverName">Karim Mama</p>
+                    <p class="text-xs text-muted flex items-center gap-1">
+                      <span id="driverRating">4.9 ★</span> · <span id="driverVehicle">Toyota Axio</span>
+                    </p>
+                  </div>
+                  <span
+                    class="ml-auto text-xs font-semibold text-emerald-dark bg-emerald-light px-2.5 py-1 rounded-full shrink-0"
+                    id="driverEta"
+                    >4 min</span
+                  >
+                </div>
+                <div class="mt-3 grid grid-cols-2 gap-2.5">
+                  <div class="bg-panel rounded-lg px-3 py-2.5 text-center">
+                    <p class="font-mono font-semibold text-sm text-ink" id="driverPlate">DHA-1234</p>
+                    <p class="text-[10px] text-muted mt-0.5">License plate</p>
+                  </div>
+                  <div class="bg-panel rounded-lg px-3 py-2.5 text-center">
+                    <p class="font-mono font-semibold text-sm text-ink" id="matchedVehicleLabel">Car</p>
+                    <p class="text-[10px] text-muted mt-0.5">Vehicle type</p>
+                  </div>
+                </div>
+
+                <div class="mt-3 grid grid-cols-2 gap-2.5">
+                  <a
+                    id="driverCallLink"
+                    href="tel:+8801711000001"
+                    class="flex items-center justify-center gap-1.5 border border-hairline rounded-lg py-2.5 text-sm font-semibold text-ink hover:bg-panel transition-colors"
+                  >
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 2 .7 2.9a2 2 0 0 1-.4 2.1L8 10a16 16 0 0 0 6 6l1.3-1.4a2 2 0 0 1 2.1-.4c.9.4 1.9.6 2.9.7a2 2 0 0 1 1.7 2Z"
+                        stroke="currentColor"
+                        stroke-width="1.7"
+                      />
+                    </svg>
+                    Call
+                  </a>
+                  <button
+                    type="button"
+                    onclick="openChatDrawer()"
+                    class="flex items-center justify-center gap-1.5 border border-hairline rounded-lg py-2.5 text-sm font-semibold text-ink hover:bg-panel transition-colors"
+                  >
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 20l1-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"
+                        stroke="currentColor"
+                        stroke-width="1.7"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                    Chat
+                    <span id="chatBadge" class="hidden w-1.5 h-1.5 rounded-full bg-clay"></span>
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onclick="startTrip()"
+                class="mt-4 w-full bg-ink hover:bg-emerald-deep text-white font-semibold text-sm py-3.5 rounded-xl transition-colors"
+              >
+                Confirm pickup & start trip
+              </button>
+              <button
+                type="button"
+                onclick="cancelRide()"
+                class="mt-2.5 w-full text-center text-sm font-semibold text-muted hover:text-red-700"
+              >
+                Cancel ride
+              </button>
+            </div>
+
+            <!-- ===== VIEW: IN PROGRESS ===== -->
+            <div id="view-inprogress" class="panel-view">
+              <p class="text-[11px] font-bold eyebrow text-emerald-dark uppercase">Ride in progress</p>
+              <h3 class="mt-1 font-display font-bold text-lg text-ink" id="tripDriverLine">Riding with Karim Mama</h3>
+
+              <div class="mt-4 border border-hairline rounded-xl p-5 text-center">
+                <p class="text-[11px] font-semibold text-muted uppercase eyebrow">Estimated time remaining</p>
+                <p class="mt-1 font-display font-bold text-3xl text-ink font-mono" id="etaCounter">08:00</p>
+                <p class="mt-1 text-xs text-muted" id="tripDistanceLine">3.2 km to Bashundhara City Mall</p>
+              </div>
+
+              <div class="mt-4 grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onclick="shareTrip()"
+                  class="flex items-center justify-center gap-1.5 border border-hairline rounded-lg py-3 text-sm font-semibold text-ink hover:bg-panel transition-colors"
+                >
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    <circle cx="18" cy="5" r="2.4" stroke="currentColor" stroke-width="1.8" />
+                    <circle cx="6" cy="12" r="2.4" stroke="currentColor" stroke-width="1.8" />
+                    <circle cx="18" cy="19" r="2.4" stroke="currentColor" stroke-width="1.8" />
+                    <path d="M8.1 10.7 15.9 6.3M8.1 13.3l7.8 4.4" stroke="currentColor" stroke-width="1.8" />
+                  </svg>
+                  Share trip
+                </button>
+                <button
+                  type="button"
+                  onclick="openSosModal()"
+                  class="flex items-center justify-center gap-1.5 border border-red-200 bg-red-50 rounded-lg py-3 text-sm font-semibold text-red-700 hover:bg-red-100 transition-colors"
+                >
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M12 9v4m0 4h.01M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  SOS
+                </button>
+              </div>
+
+              <div id="shareConfirm" class="hidden mt-3 text-xs text-emerald-dark bg-emerald-light border border-emerald-ring rounded-lg px-3 py-2.5">
+                Trip link shared with your emergency contact.
+              </div>
+
+              <button
+                type="button"
+                onclick="completeRide()"
+                class="mt-5 w-full text-center text-xs font-semibold text-muted hover:text-ink underline underline-offset-2"
+              >
+                (Demo) Skip to trip completion
+              </button>
+            </div>
+
+            <!-- ===== VIEW: COMPLETED ===== -->
+            <div id="view-completed" class="panel-view">
+              <p class="text-[11px] font-bold eyebrow text-emerald-dark uppercase">Trip complete</p>
+              <h3 class="mt-1 font-display font-bold text-lg text-ink">You've arrived, Mama!</h3>
+
+              <div class="mt-4 border border-hairline rounded-xl p-4">
+                <div class="flex items-center justify-between text-sm">
+                  <span class="text-muted">Distance travelled</span>
+                  <span class="font-mono font-semibold text-ink" id="doneDistance">—</span>
+                </div>
+                <div class="mt-1.5 flex items-center justify-between text-sm">
+                  <span class="text-muted">Fare paid</span>
+                  <span class="font-mono font-semibold text-ink" id="doneFare">৳0</span>
+                </div>
+                <div class="mt-1.5 flex items-center justify-between text-sm">
+                  <span class="text-muted">Payment method</span>
+                  <span class="text-ink font-medium">bKash</span>
+                </div>
+              </div>
+
+              <div class="mt-5 text-center">
+                <p class="text-sm font-semibold text-ink">Rate your Mama</p>
+                <div class="mt-2 flex items-center justify-center gap-1.5" id="ratingStars">
+                  <button type="button" class="star-btn text-3xl text-hairline" data-star="1" onclick="setRating(1)">★</button>
+                  <button type="button" class="star-btn text-3xl text-hairline" data-star="2" onclick="setRating(2)">★</button>
+                  <button type="button" class="star-btn text-3xl text-hairline" data-star="3" onclick="setRating(3)">★</button>
+                  <button type="button" class="star-btn text-3xl text-hairline" data-star="4" onclick="setRating(4)">★</button>
+                  <button type="button" class="star-btn text-3xl text-hairline" data-star="5" onclick="setRating(5)">★</button>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onclick="submitRating()"
+                class="mt-5 w-full bg-ink hover:bg-emerald-deep text-white font-semibold text-sm py-3.5 rounded-xl transition-colors"
+              >
+                Submit rating & finish
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- ============ PROFILE DRAWER ============ -->
+    <div id="profileBackdrop" onclick="closeProfileDrawer()" class="fixed inset-0 bg-ink/50 backdrop-blur-[2px] z-40 hidden"></div>
+    <aside
+      id="profileDrawer"
+      class="drawer fixed inset-y-0 right-0 z-50 w-full max-w-sm bg-white shadow-modal transform translate-x-full flex flex-col"
+    >
+      <div class="flex items-center justify-between px-5 h-14 border-b border-hairline shrink-0">
+        <h3 class="font-display font-bold text-ink">Your profile</h3>
+        <button onclick="closeProfileDrawer()" class="w-8 h-8 grid place-items-center rounded-full hover:bg-panel text-muted">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none">
+            <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto px-5 py-5">
+        <div class="flex items-center gap-3.5 border border-hairline rounded-xl p-4">
+          <span class="w-12 h-12 rounded-full bg-emerald-light text-emerald-dark grid place-items-center font-display font-bold text-lg shrink-0"
+            >NJ</span
+          >
+          <div class="min-w-0">
+            <p class="font-display font-semibold text-ink">Nusrat Jahan</p>
+            <p class="text-xs text-muted">01822-345678</p>
+            <p class="text-xs text-muted mt-0.5">4.86 ★ rating · 132 rides taken</p>
+          </div>
+        </div>
+
+        <div class="mt-6">
+          <p class="text-[11px] font-bold eyebrow text-muted uppercase">Available coupons</p>
+          <div id="drawerCouponList" class="mt-2.5 space-y-2.5"></div>
+        </div>
+
+        <div class="mt-6">
+          <p class="text-[11px] font-bold eyebrow text-muted uppercase">Ride history</p>
+          <div id="rideHistoryList" class="mt-2.5 space-y-2.5"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ============ CHAT DRAWER ============ -->
+    <div id="chatBackdrop" onclick="closeChatDrawer()" class="fixed inset-0 bg-ink/50 backdrop-blur-[2px] z-40 hidden"></div>
+    <aside
+      id="chatDrawer"
+      class="drawer fixed inset-y-0 right-0 z-50 w-full max-w-sm bg-white shadow-modal transform translate-x-full flex flex-col"
+    >
+      <div class="flex items-center justify-between px-5 h-14 border-b border-hairline shrink-0">
+        <div class="flex items-center gap-2.5">
+          <span class="w-8 h-8 rounded-full bg-clay-light text-clay-dark grid place-items-center font-display font-bold text-xs" id="chatAvatar"
+            >KM</span
+          >
+          <div>
+            <p class="font-display font-semibold text-sm text-ink" id="chatDriverName">Karim Mama</p>
+            <p class="text-[11px] text-emerald-dark flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald"></span> Online
+            </p>
+          </div>
+        </div>
+        <button onclick="closeChatDrawer()" class="w-8 h-8 grid place-items-center rounded-full hover:bg-panel text-muted">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none">
+            <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+      </div>
+
+      <div id="chatMessages" class="flex-1 overflow-y-auto px-5 py-4 space-y-3 bg-canvas"></div>
+
+      <form
+        onsubmit="event.preventDefault(); sendChatMessage();"
+        class="shrink-0 border-t border-hairline p-3 flex items-center gap-2"
+      >
+        <input
+          id="chatInput"
+          type="text"
+          placeholder="Type a message…"
+          class="flex-1 min-w-0 px-3.5 py-2.5 rounded-lg border border-hairline text-sm placeholder:text-muted"
+        />
+        <button
+          type="submit"
+          class="w-10 h-10 shrink-0 grid place-items-center rounded-lg bg-ink hover:bg-emerald-deep text-white transition-colors"
+        >
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none">
+            <path d="M5 12h14M13 5l7 7-7 7" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+      </form>
+    </aside>
+
+    <!-- ============ SOS MODAL ============ -->
+    <div id="sosOverlay" class="modal-overlay">
+      <div class="bg-white rounded-xl shadow-modal max-w-sm w-full p-6 relative">
+        <div class="w-11 h-11 rounded-full bg-red-50 border border-red-200 grid place-items-center">
+          <svg class="w-5 h-5 text-red-700" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M12 9v4m0 4h.01M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </div>
+        <h3 class="mt-3 font-display font-bold text-lg text-ink">Send an emergency alert?</h3>
+        <p class="mt-1.5 text-sm text-muted leading-relaxed">
+          This notifies Mama Jaben?'s safety team and your emergency contact with your live trip location.
+        </p>
+        <div class="mt-5 grid grid-cols-2 gap-2.5">
+          <button
+            onclick="closeSosModal()"
+            class="border border-hairline rounded-lg py-3 text-sm font-semibold text-ink hover:bg-panel transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onclick="confirmSos()"
+            class="bg-red-600 hover:bg-red-700 text-white rounded-lg py-3 text-sm font-semibold transition-colors"
+          >
+            Send SOS
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ TOAST CONTAINER ============ -->
+    <div id="toastContainer" class="fixed bottom-4 inset-x-0 z-[300] flex flex-col items-center gap-2 pointer-events-none px-4"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+      /* ---------------------------------------------------
+         DATA
+      --------------------------------------------------- */
+      const locations = {
+        "Dhanmondi 27": { lat: 23.7461, lng: 90.3742 },
+        "Gulshan 1": { lat: 23.7809, lng: 90.4172 },
+        "Gulshan 2": { lat: 23.7925, lng: 90.4078 },
+        "Banani": { lat: 23.7936, lng: 90.4043 },
+        "Mohakhali": { lat: 23.7806, lng: 90.4023 },
+        "Uttara Sector 7": { lat: 23.8759, lng: 90.3795 },
+        "Mirpur 10": { lat: 23.8069, lng: 90.3687 },
+        "Bashundhara City Mall": { lat: 23.7509, lng: 90.3927 },
+        "Motijheel": { lat: 23.7332, lng: 90.4172 },
+        "Farmgate": { lat: 23.7574, lng: 90.3898 },
+        "Shahbagh": { lat: 23.7386, lng: 90.3958 },
+        "Hazrat Shahjalal Airport": { lat: 23.8433, lng: 90.3978 },
+        "Wari": { lat: 23.7189, lng: 90.4227 },
+        "Jatrabari": { lat: 23.7104, lng: 90.4331 },
+      };
+
+      const vehicles = {
+        bike: { label: "Bike", base: 25, perKm: 8 },
+        car4: { label: "Car (4 Seats)", base: 80, perKm: 18 },
+        car6: { label: "Car (6 Seats)", base: 120, perKm: 24 },
+      };
+
+      const coupons = [
+        { code: "MAMA50", label: "৳50 flat off", type: "flat", value: 50, minFare: 150, expiry: "31 Aug 2026" },
+        { code: "FIRST20", label: "20% off, up to ৳100", type: "percent", value: 20, maxDiscount: 100, minFare: 0, expiry: "15 Aug 2026" },
+        { code: "WEEKEND10", label: "10% off, up to ৳60", type: "percent", value: 10, maxDiscount: 60, minFare: 100, expiry: "10 Aug 2026" },
+      ];
+
+      const driverPool = [
+        { type: "bike", name: "Rafiq Mama", rating: "4.8 ★", vehicle: "Honda CB Shine 125", plate: "DHA METRO GA-2245", phone: "+8801711000002", etaMin: 3 },
+        { type: "bike", name: "Salam Mama", rating: "4.75 ★", vehicle: "Bajaj Pulsar 150", plate: "DHA METRO HA-8891", phone: "+8801711000004", etaMin: 5 },
+        { type: "car", name: "Karim Mama", rating: "4.9 ★", vehicle: "Toyota Axio", plate: "DHA METRO KHA-3312", phone: "+8801711000001", etaMin: 4 },
+        { type: "car", name: "Jashim Mama", rating: "4.95 ★", vehicle: "Toyota Noah", plate: "DHA METRO GA-7765", phone: "+8801711000003", etaMin: 6 },
+      ];
+
+      let rideHistory = [
+        { date: "28 Jul 2026", pickup: "Dhanmondi 27", dropoff: "Bashundhara City Mall", vehicle: "Car (4 Seats)", fare: 210, status: "Completed" },
+        { date: "25 Jul 2026", pickup: "Gulshan 1", dropoff: "Motijheel", vehicle: "Bike", fare: 95, status: "Completed" },
+        { date: "20 Jul 2026", pickup: "Uttara Sector 7", dropoff: "Hazrat Shahjalal Airport", vehicle: "Car (6 Seats)", fare: 180, status: "Canceled" },
+      ];
+
+      /* ---------------------------------------------------
+         STATE
+      --------------------------------------------------- */
+      const state = {
+        vehicle: "bike",
+        pickup: null,
+        destination: null,
+        coupon: null,
+        fareResult: null,
+        driver: null,
+        rating: 0,
+      };
+      let tripTimer = null;
+      let tripTotalSeconds = 0;
+
+      /* ---------------------------------------------------
+         MAP SETUP
+      --------------------------------------------------- */
+      const map = L.map("map", { zoomControl: false }).setView([23.7808, 90.4127], 12.5);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap contributors",
+        maxZoom: 19,
+      }).addTo(map);
+      L.control.zoom({ position: "bottomright" }).addTo(map);
+
+      const pickupIcon = L.divIcon({
+        html: '<div style="width:16px;height:16px;border-radius:999px;background:#0E7A5A;border:3px solid white;box-shadow:0 1px 4px rgba(13,20,32,0.35)"></div>',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+      });
+      const destIcon = L.divIcon({
+        html: '<div style="width:16px;height:16px;border-radius:999px;background:#9C5A33;border:3px solid white;box-shadow:0 1px 4px rgba(13,20,32,0.35)"></div>',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+      });
+
+      let pickupMarker = null;
+      let destMarker = null;
+      let routeLine = null;
+
+      map.on("click", (e) => {
+        if (!state.pickup) {
+          setPickup(e.latlng, "Pinned pickup");
+        } else if (!state.destination) {
+          setDestination(e.latlng, "Pinned destination");
+        } else {
+          showToast("Both points are set. Clear a field to re-pin.");
+        }
+      });
+
+      setTimeout(() => map.invalidateSize(), 150);
+      window.addEventListener("resize", () => map.invalidateSize());
+
+      /* ---------------------------------------------------
+         LOCATION HELPERS
+      --------------------------------------------------- */
+      function populateLocationList() {
+        const list = document.getElementById("locationList");
+        list.innerHTML = Object.keys(locations)
+          .map((name) => '<option value="' + name + '"></option>')
+          .join("");
+      }
+      populateLocationList();
+
+      function haversineKm(a, b) {
+        const R = 6371;
+        const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+        const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+        const lat1 = (a.lat * Math.PI) / 180;
+        const lat2 = (b.lat * Math.PI) / 180;
+        const h =
+          Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+      }
+
+      function setPickup(latlng, label) {
+        state.pickup = { lat: latlng.lat, lng: latlng.lng, name: label };
+        if (pickupMarker) map.removeLayer(pickupMarker);
+        pickupMarker = L.marker(latlng, { icon: pickupIcon }).addTo(map);
+        document.getElementById("pickupInput").value = label;
+        document.getElementById("clearPickupBtn").classList.remove("hidden");
+        refreshRoute();
+      }
+
+      function setDestination(latlng, label) {
+        state.destination = { lat: latlng.lat, lng: latlng.lng, name: label };
+        if (destMarker) map.removeLayer(destMarker);
+        destMarker = L.marker(latlng, { icon: destIcon }).addTo(map);
+        document.getElementById("destInput").value = label;
+        document.getElementById("clearDestBtn").classList.remove("hidden");
+        refreshRoute();
+      }
+
+      function clearPickup() {
+        state.pickup = null;
+        if (pickupMarker) {
+          map.removeLayer(pickupMarker);
+          pickupMarker = null;
+        }
+        document.getElementById("pickupInput").value = "";
+        document.getElementById("clearPickupBtn").classList.add("hidden");
+        refreshRoute();
+      }
+
+      function clearDestination() {
+        state.destination = null;
+        if (destMarker) {
+          map.removeLayer(destMarker);
+          destMarker = null;
+        }
+        document.getElementById("destInput").value = "";
+        document.getElementById("clearDestBtn").classList.add("hidden");
+        refreshRoute();
+      }
+
+      function handleLocationInput(field, value) {
+        const trimmed = value.trim();
+        const match = Object.keys(locations).find((name) => name.toLowerCase() === trimmed.toLowerCase());
+        if (!match) {
+          showToast("Location not recognized — pick a suggestion or tap the map.");
+          return;
+        }
+        if (field === "pickup") setPickup(locations[match], match);
+        else setDestination(locations[match], match);
+      }
+
+      function useCurrentLocation() {
+        if (!navigator.geolocation) {
+          showToast("Geolocation isn't supported on this browser.");
+          return;
+        }
+        showToast("Fetching your location…");
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const latlng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            setPickup(latlng, "Current Location");
+            map.setView(latlng, 15);
+          },
+          () => showToast("Couldn't get your location. Check GPS permissions."),
+        );
+      }
+
+      function refreshRoute() {
+        if (routeLine) {
+          map.removeLayer(routeLine);
+          routeLine = null;
+        }
+        if (state.pickup && state.destination) {
+          const latlngs = [
+            [state.pickup.lat, state.pickup.lng],
+            [state.destination.lat, state.destination.lng],
+          ];
+          routeLine = L.polyline(latlngs, { color: "#0D1420", weight: 3, opacity: 0.55, dashArray: "2 8" }).addTo(map);
+          map.fitBounds(routeLine.getBounds(), { padding: [70, 70] });
+        }
+        updateFareUI();
+      }
+
+      /* ---------------------------------------------------
+         VEHICLE SELECTOR
+      --------------------------------------------------- */
+      function styleVehicleCards() {
+        document.querySelectorAll(".vehicle-card").forEach((btn) => {
+          const active = btn.dataset.vehicle === state.vehicle;
+          btn.className =
+            "vehicle-card text-left border rounded-xl p-3 transition-colors " +
+            (active ? "border-emerald bg-emerald-light" : "border-hairline bg-white hover:border-emerald-ring");
+        });
+      }
+      function selectVehicle(id) {
+        state.vehicle = id;
+        styleVehicleCards();
+        updateFareUI();
+      }
+      styleVehicleCards();
+
+      /* ---------------------------------------------------
+         COUPONS
+      --------------------------------------------------- */
+      function toggleCouponList() {
+        const el = document.getElementById("couponList");
+        if (el.classList.contains("hidden")) {
+          el.innerHTML = coupons
+            .map(
+              (c) =>
+                '<div class="flex items-center justify-between border border-hairline rounded-lg px-3 py-2.5"><div><p class="text-xs font-semibold text-ink font-mono">' +
+                c.code +
+                '</p><p class="text-[11px] text-muted">' +
+                c.label +
+                " · expires " +
+                c.expiry +
+                '</p></div><button type="button" onclick="applyCoupon(\'' +
+                c.code +
+                '\')" class="text-[11px] font-semibold text-emerald-dark hover:underline shrink-0 ml-2">Apply</button></div>',
+            )
+            .join("");
+          el.classList.remove("hidden");
+        } else {
+          el.classList.add("hidden");
+        }
+      }
+
+      function applyPromoFromInput() {
+        const code = document.getElementById("promoInput").value.trim().toUpperCase();
+        if (!code) {
+          showToast("Enter a promo code first.");
+          return;
+        }
+        applyCoupon(code);
+      }
+
+      function applyCoupon(code) {
+        const found = coupons.find((c) => c.code.toUpperCase() === code.toUpperCase());
+        if (!found) {
+          showToast("That promo code isn't valid.");
+          return;
+        }
+        state.coupon = found;
+        document.getElementById("promoInput").value = found.code;
+        document.getElementById("appliedCouponRow").classList.remove("hidden");
+        document.getElementById("appliedCouponLabel").textContent = found.code + " applied — " + found.label;
+        document.getElementById("couponList").classList.add("hidden");
+        showToast(found.code + " applied.");
+        updateFareUI();
+      }
+
+      function removeCoupon() {
+        state.coupon = null;
+        document.getElementById("appliedCouponRow").classList.add("hidden");
+        document.getElementById("promoInput").value = "";
+        updateFareUI();
+      }
+
+      /* ---------------------------------------------------
+         FARE CALCULATION
+      --------------------------------------------------- */
+      function computeFare() {
+        if (!state.pickup || !state.destination) return null;
+        const distanceKm = haversineKm(state.pickup, state.destination);
+        const v = vehicles[state.vehicle];
+        let base = v.base + v.perKm * distanceKm;
+        base = Math.round(base / 5) * 5;
+        let discount = 0;
+        if (state.coupon && base >= state.coupon.minFare) {
+          if (state.coupon.type === "flat") discount = state.coupon.value;
+          else discount = Math.min(Math.round((base * state.coupon.value) / 100), state.coupon.maxDiscount || Infinity);
+        }
+        const final = Math.max(base - discount, 0);
+        return { distanceKm, base, discount, final };
+      }
+
+      function updateFareUI() {
+        const fare = computeFare();
+        const card = document.getElementById("fareCard");
+        const btn = document.getElementById("requestRideBtn");
+        if (!fare) {
+          card.classList.add("hidden");
+          btn.disabled = true;
+          btn.className = "mt-6 w-full bg-ink text-white font-semibold text-sm py-3.5 rounded-xl transition-colors opacity-40 cursor-not-allowed";
+          return;
+        }
+        state.fareResult = fare;
+        card.classList.remove("hidden");
+        document.getElementById("fareDistance").textContent = fare.distanceKm.toFixed(1) + " km";
+        document.getElementById("fareOriginal").textContent = "৳" + fare.base;
+        if (fare.discount > 0) {
+          document.getElementById("fareDiscountRow").classList.remove("hidden");
+          document.getElementById("fareDiscount").textContent = "−৳" + fare.discount;
+        } else {
+          document.getElementById("fareDiscountRow").classList.add("hidden");
+        }
+        document.getElementById("fareFinal").textContent = "৳" + fare.final;
+        btn.disabled = false;
+        btn.className =
+          "mt-6 w-full bg-ink hover:bg-emerald-deep text-white font-semibold text-sm py-3.5 rounded-xl transition-colors";
+      }
+
+      /* ---------------------------------------------------
+         VIEW SWITCHING
+      --------------------------------------------------- */
+      function showView(name) {
+        document.querySelectorAll(".panel-view").forEach((v) => v.classList.remove("active"));
+        document.getElementById("view-" + name).classList.add("active");
+        document.getElementById("bookingPanel").scrollTop = 0;
+        const pill = document.getElementById("statusPill");
+        const labels = {
+          book: ["Ready to ride", "bg-emerald"],
+          searching: ["Searching…", "bg-clay"],
+          matched: ["Mama found", "bg-clay"],
+          inprogress: ["Ride in progress", "bg-emerald"],
+          completed: ["Trip complete", "bg-emerald"],
+        };
+        const [text, dot] = labels[name];
+        pill.innerHTML = '<span class="w-1.5 h-1.5 rounded-full ' + dot + '"></span> ' + text;
+      }
+
+      /* ---------------------------------------------------
+         RIDE LIFECYCLE
+      --------------------------------------------------- */
+      function requestRide() {
+        const fare = computeFare();
+        if (!fare) {
+          showToast("Set both pickup and destination first.");
+          return;
+        }
+        showView("searching");
+        setTimeout(matchDriver, 2200);
+      }
+
+      function matchDriver() {
+        const type = state.vehicle === "bike" ? "bike" : "car";
+        const pool = driverPool.filter((d) => d.type === type);
+        const driver = pool[Math.floor(Math.random() * pool.length)];
+        state.driver = driver;
+
+        const initials = driver.name
+          .split(" ")
+          .map((w) => w[0])
+          .join("")
+          .slice(0, 2)
+          .toUpperCase();
+        document.getElementById("driverAvatar").textContent = initials;
+        document.getElementById("chatAvatar").textContent = initials;
+        document.getElementById("driverName").textContent = driver.name;
+        document.getElementById("chatDriverName").textContent = driver.name;
+        document.getElementById("driverRating").textContent = driver.rating;
+        document.getElementById("driverVehicle").textContent = driver.vehicle;
+        document.getElementById("driverEta").textContent = driver.etaMin + " min";
+        document.getElementById("driverPlate").textContent = driver.plate;
+        document.getElementById("matchedVehicleLabel").textContent = vehicles[state.vehicle].label;
+        document.getElementById("driverCallLink").setAttribute("href", "tel:" + driver.phone);
+
+        chatMessages = [{ from: "driver", text: "Assalamu alaikum! I'm heading your way now." }];
+        renderChat();
+
+        showView("matched");
+        showToast(driver.name + " accepted your ride.");
+      }
+
+      function startTrip() {
+        const distanceKm = state.fareResult ? state.fareResult.distanceKm : 3;
+        const avgSpeedKmh = 22;
+        tripTotalSeconds = Math.max(90, Math.round((distanceKm / avgSpeedKmh) * 3600));
+        document.getElementById("tripDriverLine").textContent = "Riding with " + state.driver.name;
+        document.getElementById("tripDistanceLine").textContent =
+          distanceKm.toFixed(1) + " km to " + (state.destination ? state.destination.name : "destination");
+        document.getElementById("shareConfirm").classList.add("hidden");
+        showView("inprogress");
+        renderEta();
+        tripTimer = setInterval(() => {
+          tripTotalSeconds--;
+          if (tripTotalSeconds <= 0) {
+            clearInterval(tripTimer);
+            completeRide();
+            return;
+          }
+          renderEta();
+        }, 1000);
+      }
+
+      function renderEta() {
+        const m = Math.floor(tripTotalSeconds / 60)
+          .toString()
+          .padStart(2, "0");
+        const s = (tripTotalSeconds % 60).toString().padStart(2, "0");
+        document.getElementById("etaCounter").textContent = m + ":" + s;
+      }
+
+      function shareTrip() {
+        document.getElementById("shareConfirm").classList.remove("hidden");
+        showToast("Trip shared with your emergency contact.");
+      }
+
+      function completeRide() {
+        if (tripTimer) clearInterval(tripTimer);
+        const fare = state.fareResult || { distanceKm: 0, final: 0 };
+        document.getElementById("doneDistance").textContent = fare.distanceKm.toFixed(1) + " km";
+        document.getElementById("doneFare").textContent = "৳" + fare.final;
+        state.rating = 0;
+        renderStars();
+        showView("completed");
+      }
+
+      function cancelRide() {
+        if (tripTimer) clearInterval(tripTimer);
+        rideHistory.unshift({
+          date: "1 Aug 2026",
+          pickup: state.pickup ? state.pickup.name : "—",
+          dropoff: state.destination ? state.destination.name : "—",
+          vehicle: vehicles[state.vehicle].label,
+          fare: state.fareResult ? state.fareResult.final : 0,
+          status: "Canceled",
+        });
+        renderRideHistory();
+        showToast("Ride canceled.");
+        resetRide();
+        showView("book");
+      }
+
+      function resetRide() {
+        clearPickup();
+        clearDestination();
+        removeCoupon();
+        state.driver = null;
+        state.fareResult = null;
+      }
+
+      /* ---------------------------------------------------
+         RATING
+      --------------------------------------------------- */
+      function setRating(n) {
+        state.rating = n;
+        renderStars();
+      }
+      function renderStars() {
+        document.querySelectorAll("#ratingStars .star-btn").forEach((btn) => {
+          const filled = Number(btn.dataset.star) <= state.rating;
+          btn.className = "star-btn text-3xl " + (filled ? "text-clay" : "text-hairline");
+        });
+      }
+
+      function submitRating() {
+        const fare = state.fareResult || { distanceKm: 0, final: 0 };
+        rideHistory.unshift({
+          date: "1 Aug 2026",
+          pickup: state.pickup ? state.pickup.name : "—",
+          dropoff: state.destination ? state.destination.name : "—",
+          vehicle: vehicles[state.vehicle].label,
+          fare: fare.final,
+          status: "Completed",
+        });
+        renderRideHistory();
+        showToast("Dhonnobad! Thanks for rating your Mama.");
+        resetRide();
+        showView("book");
+      }
+
+      /* ---------------------------------------------------
+         CHAT DRAWER
+      --------------------------------------------------- */
+      let chatMessages = [];
+      const cannedReplies = [
+        "Thik ache, ami asche! On my way.",
+        "Reaching in just a few minutes, please wait at the gate.",
+        "No problem, Mama. See you soon!",
+      ];
+
+      function renderChat() {
+        const wrap = document.getElementById("chatMessages");
+        wrap.innerHTML = chatMessages
+          .map((m) => {
+            if (m.from === "driver") {
+              return (
+                '<div class="flex justify-start"><div class="max-w-[80%] bg-white border border-hairline rounded-xl rounded-bl-sm px-3.5 py-2.5 text-sm text-ink">' +
+                m.text +
+                "</div></div>"
+              );
+            }
+            return (
+              '<div class="flex justify-end"><div class="max-w-[80%] bg-ink text-white rounded-xl rounded-br-sm px-3.5 py-2.5 text-sm">' +
+              m.text +
+              "</div></div>"
+            );
+          })
+          .join("");
+        wrap.scrollTop = wrap.scrollHeight;
+      }
+
+      function sendChatMessage() {
+        const input = document.getElementById("chatInput");
+        const text = input.value.trim();
+        if (!text) return;
+        chatMessages.push({ from: "passenger", text });
+        input.value = "";
+        renderChat();
+        document.getElementById("chatBadge").classList.remove("hidden");
+        setTimeout(() => {
+          const reply = cannedReplies[Math.floor(Math.random() * cannedReplies.length)];
+          chatMessages.push({ from: "driver", text: reply });
+          renderChat();
+        }, 1100);
+      }
+
+      function openChatDrawer() {
+        document.getElementById("chatBadge").classList.add("hidden");
+        document.getElementById("chatBackdrop").classList.remove("hidden");
+        document.getElementById("chatDrawer").classList.remove("translate-x-full");
+      }
+      function closeChatDrawer() {
+        document.getElementById("chatBackdrop").classList.add("hidden");
+        document.getElementById("chatDrawer").classList.add("translate-x-full");
+      }
+
+      /* ---------------------------------------------------
+         PROFILE DRAWER
+      --------------------------------------------------- */
+      function renderDrawerCoupons() {
+        const wrap = document.getElementById("drawerCouponList");
+        wrap.innerHTML = coupons
+          .map(
+            (c) =>
+              '<div class="border border-emerald-ring bg-emerald-light rounded-xl p-3.5"><div class="flex items-center justify-between"><p class="font-mono font-semibold text-sm text-emerald-dark">' +
+              c.code +
+              '</p><span class="text-[10px] text-emerald-dark">Exp ' +
+              c.expiry +
+              '</span></div><p class="text-xs text-emerald-dark mt-1">' +
+              c.label +
+              '</p><button type="button" onclick="applyCoupon(\'' +
+              c.code +
+              '\'); closeProfileDrawer();" class="mt-2 text-[11px] font-semibold text-white bg-emerald-dark hover:bg-emerald-deep px-3 py-1.5 rounded-lg transition-colors">Apply to current ride</button></div>',
+          )
+          .join("");
+      }
+
+      function renderRideHistory() {
+        const wrap = document.getElementById("rideHistoryList");
+        wrap.innerHTML = rideHistory
+          .map((r) => {
+            const statusClass =
+              r.status === "Completed"
+                ? "text-emerald-dark bg-emerald-light"
+                : "text-red-700 bg-red-50";
+            return (
+              '<div class="border border-hairline rounded-xl p-3.5"><div class="flex items-center justify-between"><p class="text-xs text-muted">' +
+              r.date +
+              '</p><span class="text-[10px] font-semibold px-2 py-0.5 rounded-full ' +
+              statusClass +
+              '">' +
+              r.status +
+              '</span></div><p class="text-sm font-medium text-ink mt-1.5">' +
+              r.pickup +
+              " → " +
+              r.dropoff +
+              '</p><div class="flex items-center justify-between mt-1"><span class="text-[11px] text-muted">' +
+              r.vehicle +
+              '</span><span class="text-sm font-mono font-semibold text-ink">৳' +
+              r.fare +
+              "</span></div></div>"
+            );
+          })
+          .join("");
+      }
+
+      function openProfileDrawer() {
+        renderDrawerCoupons();
+        renderRideHistory();
+        document.getElementById("profileBackdrop").classList.remove("hidden");
+        document.getElementById("profileDrawer").classList.remove("translate-x-full");
+      }
+      function closeProfileDrawer() {
+        document.getElementById("profileBackdrop").classList.add("hidden");
+        document.getElementById("profileDrawer").classList.add("translate-x-full");
+      }
+
+      /* ---------------------------------------------------
+         SOS MODAL
+      --------------------------------------------------- */
+      function openSosModal() {
+        document.getElementById("sosOverlay").classList.add("open");
+      }
+      function closeSosModal() {
+        document.getElementById("sosOverlay").classList.remove("open");
+      }
+      function confirmSos() {
+        closeSosModal();
+        showToast("Emergency alert sent. Our safety team has been notified.");
+      }
+
+      /* ---------------------------------------------------
+         TOASTS
+      --------------------------------------------------- */
+      function showToast(message) {
+        const container = document.getElementById("toastContainer");
+        const el = document.createElement("div");
+        el.className =
+          "toast pointer-events-auto bg-ink text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-modal max-w-xs text-center";
+        el.textContent = message;
+        container.appendChild(el);
+        setTimeout(() => {
+          el.style.opacity = "0";
+          el.style.transition = "opacity 0.25s ease";
+          setTimeout(() => el.remove(), 260);
+        }, 2600);
+      }
+
+      /* ---------------------------------------------------
+         INIT
+      --------------------------------------------------- */
+      renderRideHistory();
+    </script>
+  </body>
+</html>

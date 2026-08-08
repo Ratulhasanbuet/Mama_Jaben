@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Book a Ride — Mama Jaben?</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap"
+    rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            canvas: "#F6F7F8",
+            card: "#FFFFFF",
+            ink: "#0D1420",
+            muted: "#5B6472",
+            emerald: { DEFAULT: "#0E7A5A", dark: "#0A5E45", deep: "#0B3B2C", light: "#E7F3EC", ring: "#BFDECC" },
+            clay: { DEFAULT: "#9C5A33", dark: "#7E4826", light: "#F3EAE1", ring: "#E1CBB4" },
+            hairline: "rgba(13,20,32,0.09)",
+          },
+          fontFamily: {
+            display: ["Sora", "sans-serif"],
+            body: ["Inter", "sans-serif"],
+            mono: ['"JetBrains Mono"', "monospace"],
+          },
+          boxShadow: {
+            soft: "0 1px 2px rgba(13,20,32,0.04), 0 10px 26px -14px rgba(13,20,32,0.22)",
+            softer: "0 1px 1px rgba(13,20,32,0.03), 0 2px 8px -3px rgba(13,20,32,0.08)",
+          },
+        },
+      },
+    };
+  </script>
+  <!-- Leaflet OpenStreetMap CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    body {
+      background: #f6f7f8;
+    }
+
+    .vehicle-card.is-selected {
+      border-color: #0E7A5A;
+      box-shadow: 0 0 0 2px #BFDECC;
+      background: #E7F3EC;
+    }
+
+    #map {
+      background: #EFF1F3;
+      z-index: 1;
+    }
+  </style>
+</head>
+
+<body class="font-body text-ink antialiased">
+  <!-- ============ NAVBAR ============ -->
+  <header class="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-hairline">
+    <div class="max-w-4xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
+      <a href="{% url 'passenger_dashboard' %}" class="flex items-center gap-2.5">
+        <span class="relative w-9 h-9 grid place-items-center rounded-lg bg-ink">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+            <path d="M12 22s7-7.58 7-12.5A7 7 0 0 0 5 9.5C5 14.42 12 22 12 22Z" fill="white" />
+            <circle cx="12" cy="9.5" r="2.6" fill="#0D1420" />
+          </svg>
+        </span>
+        <span class="font-display font-bold text-lg tracking-tight text-ink">Mama <span
+            class="text-emerald">Jaben?</span></span>
+      </a>
+      <a href="{% url 'passenger_dashboard' %}" class="text-sm font-semibold text-muted hover:text-ink">&larr;
+        Dashboard</a>
+    </div>
+  </header>
+
+  <!-- ============ MESSAGES ============ -->
+  {% if messages %}
+  <div class="max-w-4xl mx-auto px-5 sm:px-8 pt-4">
+    {% for message in messages %}
+    <div
+      class="mb-3 px-4 py-3 rounded-lg text-sm font-medium border {% if message.tags == 'success' %}bg-emerald-light text-emerald-dark border-emerald-ring{% elif message.tags == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-clay-light text-clay-dark border-clay-ring{% endif %}">
+      {{ message }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <main class="max-w-4xl mx-auto px-5 sm:px-8 py-8 sm:py-10">
+    <h1 class="font-display font-bold text-2xl sm:text-3xl text-ink">Book a Ride</h1>
+    <p class="text-muted mt-1.5 text-sm sm:text-base">Pick your route and we'll work out the fare.</p>
+
+    <!-- ============ ROUTE ============ -->
+    <div class="mt-6 bg-card rounded-xl border border-hairline shadow-softer p-6 sm:p-7">
+      <div class="space-y-4">
+        <!-- Pickup input with dropdown -->
+        <div class="relative">
+          <div class="flex items-center gap-3">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald shrink-0"></span>
+            <input id="pickup-input" type="text" placeholder="Pickup location (e.g. Dhanmondi, Dhaka)"
+              autocomplete="off"
+              class="flex-1 border border-hairline rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-ring" />
+            <button type="button" id="use-current-location" title="Use current location"
+              class="shrink-0 w-9 h-9 grid place-items-center rounded-lg border border-hairline text-muted hover:text-emerald-dark hover:border-emerald-ring transition-colors">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2v3M12 19v3M2 12h3M19 12h3M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" stroke="currentColor"
+                  stroke-width="1.8" stroke-linecap="round" />
+              </svg>
+            </button>
+          </div>
+          <div id="pickup-results"
+            class="hidden absolute left-5 right-12 top-full mt-1 bg-white border border-hairline rounded-lg shadow-soft z-50 max-h-60 overflow-y-auto">
+          </div>
+        </div>
+
+        <!-- Destination input with dropdown -->
+        <div class="relative">
+          <div class="flex items-center gap-3">
+            <span class="w-2.5 h-2.5 rounded-full bg-clay shrink-0"></span>
+            <input id="dest-input" type="text" placeholder="Destination (e.g. Uttara, Dhaka)" autocomplete="off"
+              class="flex-1 border border-hairline rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-ring" />
+            <span class="w-9 shrink-0"></span>
+          </div>
+          <div id="dest-results"
+            class="hidden absolute left-5 right-12 top-full mt-1 bg-white border border-hairline rounded-lg shadow-soft z-50 max-h-60 overflow-y-auto">
+          </div>
+        </div>
+      </div>
+
+      <div id="map" class="mt-5 w-full h-72 rounded-lg border border-hairline"></div>
+    </div>
+
+    <!-- ============ FARE + VEHICLE ============ -->
+    <div id="fare-section" class="hidden mt-6 bg-card rounded-xl border border-hairline shadow-softer p-6 sm:p-7">
+      <div class="flex items-center justify-between">
+        <h2 class="font-display font-bold text-lg text-ink">Choose a ride</h2>
+        <span id="trip-meta" class="text-xs font-semibold text-muted"></span>
+      </div>
+
+      <p id="fare-loading" class="hidden text-sm text-muted mt-4">Calculating fare…</p>
+      <p id="fare-error" class="hidden text-sm text-red-600 mt-4"></p>
+
+      <div id="vehicle-options" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+        <button type="button" data-vehicle="bike"
+          class="vehicle-card text-left border border-hairline rounded-lg p-4 transition-colors hover:border-emerald-ring">
+          <p class="text-sm font-semibold text-ink">Bike</p>
+          <p class="text-xs text-muted mt-0.5">1 rider</p>
+          <p class="fare-amount font-display font-bold text-lg text-ink mt-3">৳—</p>
+        </button>
+        <button type="button" data-vehicle="car4"
+          class="vehicle-card text-left border border-hairline rounded-lg p-4 transition-colors hover:border-emerald-ring">
+          <p class="text-sm font-semibold text-ink">Car</p>
+          <p class="text-xs text-muted mt-0.5">4 seats</p>
+          <p class="fare-amount font-display font-bold text-lg text-ink mt-3">৳—</p>
+        </button>
+        <button type="button" data-vehicle="car8"
+          class="vehicle-card text-left border border-hairline rounded-lg p-4 transition-colors hover:border-emerald-ring">
+          <p class="text-sm font-semibold text-ink">Car</p>
+          <p class="text-xs text-muted mt-0.5">8 seats</p>
+          <p class="fare-amount font-display font-bold text-lg text-ink mt-3">৳—</p>
+        </button>
+      </div>
+
+      <!-- ============ COUPON ============ -->
+      <div id="coupon-section" class="hidden mt-6 pt-6 border-t border-hairline">
+        <label for="coupon-select" class="text-sm font-semibold text-ink">Apply a coupon</label>
+        <select id="coupon-select"
+          class="mt-2 w-full sm:w-72 border border-hairline rounded-lg px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-ring">
+          <option value="">No coupon</option>
+          {% for coupon in coupons %}
+          <option value="{{ coupon.code }}" data-discount="{{ coupon.discount }}">{{ coupon.code }} — {{ coupon.discount
+            }}% OFF</option>
+          {% endfor %}
+        </select>
+        {% if not coupons %}
+        <p class="text-xs text-muted mt-2">No coupons available right now.</p>
+        {% endif %}
+      </div>
+
+      <!-- ============ CONFIRM ============ -->
+      <div id="confirm-section" class="hidden mt-6 pt-6 border-t border-hairline">
+        <div class="flex items-center justify-between mb-4">
+          <span class="text-sm text-muted">Total Fare</span>
+          <span id="final-fare" class="font-display font-bold text-2xl text-ink">৳0</span>
+        </div>
+        <form method="POST" action="{% url 'confirm_booking' %}">
+          {% csrf_token %}
+          <input type="hidden" id="field-start-location" name="start_location" />
+          <input type="hidden" id="field-end-location" name="end_location" />
+          <input type="hidden" id="field-vehicle-option" name="vehicle_option" />
+          <input type="hidden" id="field-estimated-fare" name="estimated_fare" />
+          <input type="hidden" id="field-coupon-code" name="coupon_code" />
+          <button type="submit"
+            class="w-full bg-ink hover:bg-emerald-deep text-white font-semibold text-sm px-6 py-3.5 rounded-lg shadow-soft transition-colors">
+            Confirm Booking
+          </button>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const CALCULATE_FARE_URL = "{% url 'calculate_fare' %}";
+
+    let map, pickupMarker, destMarker, routePolyline;
+    let pickupLatLng = null;
+    let destLatLng = null;
+    let vehicleFares = {};
+    let selectedVehicle = null;
+    let appliedDiscount = 0;
+
+    document.addEventListener("DOMContentLoaded", () => {
+      initMap();
+
+      setupAutocomplete("pickup-input", "pickup-results", (lat, lng, label) => {
+        pickupLatLng = { lat, lng };
+        placeMarker("pickup", lat, lng);
+        tryCalculateFare();
+      });
+
+      setupAutocomplete("dest-input", "dest-results", (lat, lng, label) => {
+        destLatLng = { lat, lng };
+        placeMarker("dest", lat, lng);
+        tryCalculateFare();
+      });
+    });
+
+    function initMap() {
+      map = L.map("map").setView([23.8103, 90.4125], 12); // Default Dhaka
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      }).addTo(map);
+
+      document.getElementById("use-current-location").addEventListener("click", useCurrentLocation);
+
+      document.querySelectorAll(".vehicle-card").forEach((card) => {
+        card.addEventListener("click", () => selectVehicle(card.dataset.vehicle));
+      });
+
+      document.getElementById("coupon-select").addEventListener("change", applyCoupon);
+    }
+
+    function setupAutocomplete(inputId, resultsId, onSelect) {
+      const input = document.getElementById(inputId);
+      const results = document.getElementById(resultsId);
+      let debounceTimer;
+
+      input.addEventListener("input", () => {
+        clearTimeout(debounceTimer);
+        const query = input.value.trim();
+        if (query.length < 2) {
+          results.classList.add("hidden");
+          results.innerHTML = "";
+          return;
+        }
+
+        debounceTimer = setTimeout(async () => {
+          try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`);
+            const data = await res.json();
+            if (!data || data.length === 0) {
+              results.innerHTML = `<div class="px-3.5 py-2.5 text-xs text-muted">No locations found</div>`;
+              results.classList.remove("hidden");
+              return;
+            }
+
+            results.innerHTML = data.map((item) => `
+                <button type="button" class="w-full text-left px-3.5 py-2.5 text-xs sm:text-sm hover:bg-emerald-light/60 hover:text-emerald-dark border-b border-hairline last:border-0 transition-colors cursor-pointer" data-lat="${item.lat}" data-lon="${item.lon}" data-name="${item.display_name.replace(/"/g, '&quot;')}">
+                  ${item.display_name}
+                </button>
+              `).join("");
+            results.classList.remove("hidden");
+
+            results.querySelectorAll("button").forEach((btn) => {
+              btn.addEventListener("click", () => {
+                const lat = parseFloat(btn.dataset.lat);
+                const lng = parseFloat(btn.dataset.lon);
+                const name = btn.dataset.name;
+                input.value = name;
+                results.classList.add("hidden");
+                onSelect(lat, lng, name);
+              });
+            });
+          } catch (err) {
+            console.error("Autocomplete error:", err);
+          }
+        }, 300);
+      });
+
+      document.addEventListener("click", (e) => {
+        if (!input.contains(e.target) && !results.contains(e.target)) {
+          results.classList.add("hidden");
+        }
+      });
+    }
+
+    function createCustomIcon(label, bgColor) {
+      return L.divIcon({
+        className: 'custom-map-pin',
+        html: `<div style="background-color: ${bgColor}; color: white; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: bold; font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); border: 2px solid white;">${label}</div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+      });
+    }
+
+    function placeMarker(kind, lat, lng) {
+      const isPickup = kind === "pickup";
+      const icon = isPickup ? createCustomIcon("A", "#0E7A5A") : createCustomIcon("B", "#9C5A33");
+
+      if (isPickup) {
+        if (pickupMarker) map.removeLayer(pickupMarker);
+        pickupMarker = L.marker([lat, lng], { icon, draggable: true }).addTo(map);
+        pickupMarker.on("dragend", (e) => {
+          const pos = e.target.getLatLng();
+          pickupLatLng = { lat: pos.lat, lng: pos.lng };
+          drawRouteLine();
+          reverseGeocode(pos.lat, pos.lng, "pickup-input");
+          tryCalculateFare();
+        });
+      } else {
+        if (destMarker) map.removeLayer(destMarker);
+        destMarker = L.marker([lat, lng], { icon, draggable: true }).addTo(map);
+        destMarker.on("dragend", (e) => {
+          const pos = e.target.getLatLng();
+          destLatLng = { lat: pos.lat, lng: pos.lng };
+          drawRouteLine();
+          reverseGeocode(pos.lat, pos.lng, "dest-input");
+          tryCalculateFare();
+        });
+      }
+
+      fitMapToMarkers();
+      drawRouteLine();
+    }
+
+    async function reverseGeocode(lat, lng, inputId) {
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+        const data = await res.json();
+        if (data && data.display_name) {
+          document.getElementById(inputId).value = data.display_name;
+        }
+      } catch (err) {
+        console.error("Reverse geocode error:", err);
+      }
+    }
+
+    function fitMapToMarkers() {
+      if (pickupLatLng && destLatLng) {
+        const bounds = L.latLngBounds([
+          [pickupLatLng.lat, pickupLatLng.lng],
+          [destLatLng.lat, destLatLng.lng]
+        ]);
+        map.fitBounds(bounds, { padding: [50, 50] });
+      } else if (pickupLatLng) {
+        map.setView([pickupLatLng.lat, pickupLatLng.lng], 15);
+      } else if (destLatLng) {
+        map.setView([destLatLng.lat, destLatLng.lng], 15);
+      }
+    }
+
+    function drawRouteLine() {
+      if (routePolyline) map.removeLayer(routePolyline);
+      if (!(pickupLatLng && destLatLng)) return;
+      routePolyline = L.polyline([
+        [pickupLatLng.lat, pickupLatLng.lng],
+        [destLatLng.lat, destLatLng.lng]
+      ], {
+        color: '#0E7A5A',
+        weight: 4,
+        dashArray: '8, 8',
+        opacity: 0.8
+      }).addTo(map);
+    }
+
+    function useCurrentLocation() {
+      if (!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        pickupLatLng = { lat, lng };
+        placeMarker("pickup", lat, lng);
+        await reverseGeocode(lat, lng, "pickup-input");
+        tryCalculateFare();
+      });
+    }
+
+    async function tryCalculateFare() {
+      if (!(pickupLatLng && destLatLng)) return;
+
+      const fareSection = document.getElementById("fare-section");
+      const loading = document.getElementById("fare-loading");
+      const error = document.getElementById("fare-error");
+      const options = document.getElementById("vehicle-options");
+
+      fareSection.classList.remove("hidden");
+      loading.classList.remove("hidden");
+      error.classList.add("hidden");
+      options.classList.add("hidden");
+
+      try {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || "";
+        const res = await fetch(CALCULATE_FARE_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+          body: JSON.stringify({
+            pickup_lat: pickupLatLng.lat,
+            pickup_lng: pickupLatLng.lng,
+            dest_lat: destLatLng.lat,
+            dest_lng: destLatLng.lng,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not calculate fare");
+
+        vehicleFares = data.fares;
+        document.getElementById("trip-meta").textContent = `${data.distance_km} km · ${data.duration_min} min`;
+        renderVehicleFares();
+        options.classList.remove("hidden");
+      } catch (err) {
+        error.textContent = err.message || "Fare calculate kora gelo na. Abar try koro.";
+        error.classList.remove("hidden");
+      } finally {
+        loading.classList.add("hidden");
+      }
+    }
+
+    function renderVehicleFares() {
+      document.querySelectorAll(".vehicle-card").forEach((card) => {
+        const key = card.dataset.vehicle;
+        card.querySelector(".fare-amount").textContent = "৳" + vehicleFares[key];
+      });
+      if (selectedVehicle) updateTotal();
+    }
+
+    function selectVehicle(key) {
+      selectedVehicle = key;
+      document.querySelectorAll(".vehicle-card").forEach((card) => {
+        card.classList.toggle("is-selected", card.dataset.vehicle === key);
+      });
+      document.getElementById("coupon-section").classList.remove("hidden");
+      document.getElementById("confirm-section").classList.remove("hidden");
+      updateTotal();
+    }
+
+    function applyCoupon() {
+      const select = document.getElementById("coupon-select");
+      const opt = select.options[select.selectedIndex];
+      appliedDiscount = opt.value ? parseFloat(opt.dataset.discount) : 0;
+      document.getElementById("field-coupon-code").value = opt.value || "";
+      updateTotal();
+    }
+
+    function updateTotal() {
+      if (!selectedVehicle) return;
+      const base = vehicleFares[selectedVehicle];
+      const total = appliedDiscount ? base * (1 - appliedDiscount / 100) : base;
+
+      document.getElementById("final-fare").textContent = "৳" + Math.round(total);
+      document.getElementById("field-vehicle-option").value = selectedVehicle;
+      document.getElementById("field-estimated-fare").value = Math.round(total);
+      document.getElementById("field-start-location").value = document.getElementById("pickup-input").value;
+      document.getElementById("field-end-location").value = document.getElementById("dest-input").value;
+    }
+  </script>
+</body>
+
+</html>

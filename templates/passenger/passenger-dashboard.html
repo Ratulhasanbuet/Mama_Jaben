@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard — Mama Jaben?</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@600;700;800&family=JetBrains+Mono:wght@500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              canvas: "#F6F7F8",
+              panel: "#EFF1F3",
+              card: "#FFFFFF",
+              ink: "#0D1420",
+              muted: "#5B6472",
+              emerald: {
+                DEFAULT: "#0E7A5A",
+                dark: "#0A5E45",
+                deep: "#0B3B2C",
+                light: "#E7F3EC",
+                ring: "#BFDECC",
+              },
+              clay: {
+                DEFAULT: "#9C5A33",
+                dark: "#7E4826",
+                light: "#F3EAE1",
+                ring: "#E1CBB4",
+              },
+              hairline: "rgba(13,20,32,0.09)",
+            },
+            fontFamily: {
+              display: ["Sora", "sans-serif"],
+              body: ["Inter", "sans-serif"],
+              bn: ['"Noto Sans Bengali"', "sans-serif"],
+              mono: ['"JetBrains Mono"', "monospace"],
+            },
+            boxShadow: {
+              soft: "0 1px 2px rgba(13,20,32,0.04), 0 10px 26px -14px rgba(13,20,32,0.22)",
+              softer: "0 1px 1px rgba(13,20,32,0.03), 0 2px 8px -3px rgba(13,20,32,0.08)",
+              ticket: "0 1px 1px rgba(13,20,32,0.03), 0 20px 40px -20px rgba(13,20,32,0.28)",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        background: #f6f7f8;
+      }
+      ::selection {
+        background: #bfdecc;
+        color: #0d1420;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body class="font-body text-ink antialiased">
+    <!-- ============ NAVBAR ============ -->
+    <header class="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-hairline">
+      <div class="max-w-7xl mx-auto px-5 sm:px-8">
+        <div class="h-16 flex items-center justify-between gap-4">
+          <a href="{% url 'passenger_dashboard' %}" class="flex items-center gap-2.5 shrink-0">
+            <span class="relative w-9 h-9 grid place-items-center rounded-lg bg-ink">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M12 22s7-7.58 7-12.5A7 7 0 0 0 5 9.5C5 14.42 12 22 12 22Z"
+                  fill="white"
+                />
+                <circle cx="12" cy="9.5" r="2.6" fill="#0D1420" />
+              </svg>
+            </span>
+            <span class="font-display font-bold text-lg tracking-tight text-ink"
+              >Mama <span class="text-emerald">Jaben?</span></span
+            >
+          </a>
+
+          <div class="flex items-center gap-4">
+            <span class="hidden sm:block text-sm text-muted"
+              >Hi, <span class="font-semibold text-ink">{{ profile.name }}</span></span
+            >
+            <a
+              href="{% url 'logout' %}"
+              class="text-sm font-semibold text-muted hover:text-ink px-3 py-2 transition-colors"
+              >Log Out</a
+            >
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ============ MESSAGES ============ -->
+    {% if messages %}
+    <div class="max-w-7xl mx-auto px-5 sm:px-8 pt-4">
+      {% for message in messages %}
+      <div
+        class="mb-3 px-4 py-3 rounded-lg text-sm font-medium border {% if message.tags == 'success' %}bg-emerald-light text-emerald-dark border-emerald-ring{% elif message.tags == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-clay-light text-clay-dark border-clay-ring{% endif %}"
+      >
+        {{ message }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- ============ HERO ============ -->
+    <section class="relative overflow-hidden">
+      <div
+        class="absolute inset-x-0 top-0 h-72 bg-gradient-to-b from-emerald-light/70 to-transparent pointer-events-none"
+      ></div>
+      <div class="relative max-w-7xl mx-auto px-5 sm:px-8 pt-12 pb-10 lg:pt-16">
+        <span
+          class="inline-flex items-center gap-2 text-xs font-semibold text-emerald-dark bg-white border border-emerald-ring px-3 py-1.5 rounded-full shadow-softer"
+        >
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
+          </svg>
+          Welcome back, {{ profile.name }}
+        </span>
+
+        <a href="{% url 'book_ride' %}" class="group block mt-5">
+          <h1
+            class="font-display font-bold text-3xl sm:text-4xl xl:text-[2.75rem] leading-[1.1] tracking-tight"
+          >
+            <span class="font-bn block text-ink">Kothay Jaben Aj, Mama?</span>
+          </h1>
+          <p class="mt-4 text-muted text-base sm:text-lg leading-relaxed max-w-xl">
+            Pick your route, see the fare upfront, and go — safe rides,
+            transparent pricing, every time.
+          </p>
+          <span
+            class="mt-6 inline-flex items-center gap-2 bg-ink group-hover:bg-emerald-deep text-white font-semibold text-sm px-6 py-3.5 rounded-lg shadow-soft transition-colors"
+          >
+            Book a Ride
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M5 12h14M13 5l7 7-7 7"
+                stroke="white"
+                stroke-width="2.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </span>
+        </a>
+      </div>
+    </section>
+
+    <!-- ============ DASHBOARD GRID ============ -->
+    <section class="max-w-7xl mx-auto px-5 sm:px-8 pb-20">
+      <div class="grid lg:grid-cols-3 gap-6">
+        <!-- Previous Rides -->
+        <div class="lg:col-span-2 bg-card rounded-xl border border-hairline shadow-softer p-6 sm:p-7">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="font-display font-bold text-lg text-ink">Previous Rides</h2>
+            <span class="text-xs font-semibold text-muted">{{ rides|length }} total</span>
+          </div>
+
+          {% for ride in rides %}
+          <div
+            class="flex items-center justify-between gap-4 py-4 {% if not forloop.last %}border-b border-hairline{% endif %}"
+          >
+            <div class="flex items-start gap-3 min-w-0">
+              <div class="mt-1.5 flex flex-col items-center">
+                <span class="w-2 h-2 rounded-full bg-emerald shrink-0"></span>
+                <span class="w-px h-6 bg-hairline"></span>
+                <span class="w-2 h-2 rounded-full bg-clay shrink-0"></span>
+              </div>
+              <div class="min-w-0">
+                <p class="text-sm font-medium text-ink truncate">{{ ride.start_location }}</p>
+                <p class="text-sm font-medium text-ink truncate mt-2.5">{{ ride.end_location }}</p>
+                <p class="text-xs text-muted mt-1.5">
+                  {{ ride.date|date:"d M, Y" }} · {{ ride.time|time:"g:i A" }}
+                  {% if ride.vehicle_type %} · {{ ride.vehicle_type }}{% if ride.capacity %} ({{ ride.capacity }}-seat){% endif %}{% endif %}
+                  {% if ride.driver_name %} · {{ ride.driver_name }}{% endif %}
+                </p>
+              </div>
+            </div>
+            <div class="text-right shrink-0">
+              {% if ride.fare %}
+              <p class="font-display font-bold text-ink">৳{{ ride.fare|floatformat:0 }}</p>
+              {% endif %}
+              <span
+                class="inline-block mt-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full {% if ride.status == 'Accepted' %}bg-emerald-light text-emerald-dark{% elif ride.status == 'Rejected' %}bg-red-50 text-red-600{% else %}bg-clay-light text-clay-dark{% endif %}"
+                >{{ ride.status }}</span
+              >
+            </div>
+          </div>
+          {% empty %}
+          <div class="text-center py-12">
+            <p class="text-sm text-muted">No rides yet.</p>
+            <a
+              href="{% url 'book_ride' %}"
+              class="inline-flex items-center gap-1.5 mt-3 text-sm font-semibold text-emerald-dark hover:text-emerald-deep"
+            >
+              Book your first ride
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M5 12h14M13 5l7 7-7 7"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </a>
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- Right column: Profile + Coupons -->
+        <div class="flex flex-col gap-6">
+          <!-- Profile -->
+          <div class="bg-card rounded-xl border border-hairline shadow-softer p-6">
+            <div class="flex items-center gap-3">
+              <div
+                class="w-12 h-12 rounded-full bg-ink text-white grid place-items-center font-display font-bold text-lg shrink-0"
+              >
+                {{ profile.name|slice:":1"|upper }}
+              </div>
+              <div class="min-w-0">
+                <p class="font-display font-bold text-ink truncate">{{ profile.name }}</p>
+                <p class="text-xs text-muted">Passenger</p>
+              </div>
+            </div>
+            <div class="mt-5 space-y-3 text-sm">
+              <div class="flex items-center gap-2.5">
+                <svg class="w-4 h-4 shrink-0 text-muted" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.5.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C11.4 21 3 12.6 3 3c0-.6.4-1 1-1h3.4c.6 0 1 .4 1 1 0 1.2.2 2.4.6 3.5.1.4 0 .8-.2 1L6.6 10.8Z"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                <span class="text-ink">{{ profile.phone }}</span>
+              </div>
+              <div class="flex items-center gap-2.5">
+                <svg class="w-4 h-4 shrink-0 text-muted" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 6h16v12H4V6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+                  <path
+                    d="m4 7 8 6 8-6"
+                    stroke="currentColor"
+                    stroke-width="1.6"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                <span class="text-ink truncate">{{ profile.email }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Coupons -->
+          <div class="bg-card rounded-xl border border-hairline shadow-softer p-6">
+            <h2 class="font-display font-bold text-lg text-ink mb-4">Available Coupons</h2>
+            {% for coupon in coupons %}
+            <div
+              class="flex items-center justify-between gap-3 border border-dashed border-emerald-ring bg-emerald-light/40 rounded-lg px-4 py-3 {% if not forloop.last %}mb-3{% endif %}"
+            >
+              <div class="min-w-0">
+                <p class="font-mono font-semibold text-sm text-emerald-dark tracking-wide truncate">{{ coupon.code }}</p>
+                <p class="text-[11px] text-muted mt-0.5">Expires {{ coupon.expire_date|date:"d M, Y" }}</p>
+              </div>
+              <span class="font-display font-bold text-emerald-dark shrink-0">{{ coupon.discount }}% OFF</span>
+            </div>
+            {% empty %}
+            <p class="text-sm text-muted text-center py-6">No coupons available right now.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>

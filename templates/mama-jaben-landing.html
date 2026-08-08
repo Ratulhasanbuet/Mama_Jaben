@@ -1,0 +1,1352 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mama Jaben? — Dhakay ba Bahire, Mama Jaben Proti Gontoobye!</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@600;700;800&family=JetBrains+Mono:wght@500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              canvas: "#F6F7F8",
+              panel: "#EFF1F3",
+              card: "#FFFFFF",
+              ink: "#0D1420",
+              muted: "#5B6472",
+              emerald: {
+                DEFAULT: "#0E7A5A",
+                dark: "#0A5E45",
+                deep: "#0B3B2C",
+                light: "#E7F3EC",
+                ring: "#BFDECC",
+              },
+              clay: {
+                DEFAULT: "#9C5A33",
+                dark: "#7E4826",
+                light: "#F3EAE1",
+                ring: "#E1CBB4",
+              },
+              hairline: "rgba(13,20,32,0.09)",
+            },
+            fontFamily: {
+              display: ["Sora", "sans-serif"],
+              body: ["Inter", "sans-serif"],
+              bn: ['"Noto Sans Bengali"', "sans-serif"],
+              mono: ['"JetBrains Mono"', "monospace"],
+            },
+            boxShadow: {
+              soft: "0 1px 2px rgba(13,20,32,0.04), 0 10px 26px -14px rgba(13,20,32,0.22)",
+              softer: "0 1px 1px rgba(13,20,32,0.03), 0 2px 8px -3px rgba(13,20,32,0.08)",
+              modal: "0 24px 60px -18px rgba(13,20,32,0.4)",
+              ticket: "0 1px 1px rgba(13,20,32,0.03), 0 20px 40px -20px rgba(13,20,32,0.28)",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        background: #f6f7f8;
+      }
+      ::selection {
+        background: #bfdecc;
+        color: #0d1420;
+      }
+      .eyebrow {
+        letter-spacing: 0.14em;
+      }
+      input:focus,
+      textarea:focus {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(14, 122, 90, 0.16);
+        border-color: #0e7a5a;
+      }
+      .seg-btn[data-active="true"][data-color="green"] {
+        background: #0d1420;
+        color: #fff;
+      }
+      .seg-btn[data-active="true"][data-color="clay"] {
+        background: #9c5a33;
+        color: #fff;
+      }
+      .seg-btn[data-active="false"] {
+        background: transparent;
+        color: #5b6472;
+      }
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(13, 20, 32, 0.55);
+        backdrop-filter: blur(3px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        padding: 1rem;
+      }
+      .modal-overlay.open {
+        display: flex;
+      }
+      .ticket {
+        position: relative;
+      }
+      .ticket::before,
+      .ticket::after {
+        content: "";
+        position: absolute;
+        width: 22px;
+        height: 22px;
+        border-radius: 999px;
+        background: #f6f7f8;
+        top: 168px;
+        z-index: 2;
+      }
+      .ticket::before {
+        left: -11px;
+      }
+      .ticket::after {
+        right: -11px;
+      }
+      .ticket-tear {
+        border-top: 1.5px dashed rgba(13, 20, 32, 0.16);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body class="font-body text-ink antialiased">
+    <!-- ============ NAVBAR ============ -->
+    <header
+      class="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-hairline"
+    >
+      <div class="max-w-7xl mx-auto px-5 sm:px-8">
+        <div class="h-16 flex items-center justify-between gap-4">
+          <a href="#top" class="flex items-center gap-2.5 shrink-0">
+            <span
+              class="relative w-9 h-9 grid place-items-center rounded-lg bg-ink"
+            >
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M12 22s7-7.58 7-12.5A7 7 0 0 0 5 9.5C5 14.42 12 22 12 22Z"
+                  fill="white"
+                />
+                <circle cx="12" cy="9.5" r="2.6" fill="#0D1420" />
+              </svg>
+            </span>
+            <span class="font-display font-bold text-lg tracking-tight text-ink"
+              >Mama <span class="text-emerald">Jaben?</span></span
+            >
+          </a>
+
+          <nav
+            class="hidden lg:flex items-center gap-8 font-medium text-sm text-muted"
+          >
+            <a href="#top" class="hover:text-ink transition-colors">Home</a>
+            <a href="#how-it-works" class="hover:text-ink transition-colors"
+              >How it Works</a
+            >
+            <a href="#for-drivers" class="hover:text-ink transition-colors"
+              >For Drivers</a
+            >
+            <a href="#features" class="hover:text-ink transition-colors"
+              >Features</a
+            >
+            <a href="#safety" class="hover:text-ink transition-colors"
+              >Safety</a
+            >
+          </nav>
+
+          <div class="hidden md:flex items-center gap-3">
+            <button
+              onclick="openModal('login')"
+              class="text-sm font-semibold text-muted hover:text-ink px-3 py-2 transition-colors"
+            >
+              Log In
+            </button>
+            <button
+              onclick="openModal('signup')"
+              class="text-sm font-semibold text-white bg-ink hover:bg-emerald-deep px-5 py-2.5 rounded-lg shadow-soft transition-colors"
+            >
+              Sign Up
+            </button>
+          </div>
+
+          <button
+            id="mobileMenuBtn"
+            class="md:hidden w-10 h-10 grid place-items-center rounded-lg border border-hairline"
+          >
+            <svg class="w-5 h-5 text-ink" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M4 7h16M4 12h16M4 17h16"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div
+        id="mobileMenu"
+        class="hidden md:hidden border-t border-hairline bg-white px-5 py-4 space-y-3"
+      >
+        <a href="#top" class="block text-sm font-medium text-muted">Home</a>
+        <a href="#how-it-works" class="block text-sm font-medium text-muted"
+          >How it Works</a
+        >
+        <a href="#for-drivers" class="block text-sm font-medium text-muted"
+          >For Drivers</a
+        >
+        <a href="#features" class="block text-sm font-medium text-muted"
+          >Features</a
+        >
+        <a href="#safety" class="block text-sm font-medium text-muted"
+          >Safety</a
+        >
+        <div class="flex gap-2 pt-2">
+          <button
+            onclick="openModal('login')"
+            class="flex-1 text-sm font-semibold text-muted border border-hairline rounded-lg py-2.5"
+          >
+            Log In
+          </button>
+          <button
+            onclick="openModal('signup')"
+            class="flex-1 text-sm font-semibold text-white bg-ink rounded-lg py-2.5"
+          >
+            Sign Up
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- ============ HERO ============ -->
+    <section id="top" class="relative overflow-hidden">
+      <div
+        class="absolute inset-x-0 top-0 h-96 bg-gradient-to-b from-emerald-light/70 to-transparent pointer-events-none"
+      ></div>
+      <div
+        class="relative max-w-7xl mx-auto px-5 sm:px-8 pt-16 pb-14 lg:pt-20 grid lg:grid-cols-2 gap-14 items-center"
+      >
+        <div>
+          <span
+            class="inline-flex items-center gap-2 text-xs font-semibold text-emerald-dark bg-white border border-emerald-ring px-3 py-1.5 rounded-full shadow-softer"
+          >
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
+            </svg>
+            Bangladesh's smartest ride network
+          </span>
+
+          <h1
+            class="mt-5 font-display font-bold text-4xl sm:text-5xl xl:text-[3.3rem] leading-[1.08] tracking-tight"
+          >
+            <span class="font-bn block text-ink">Dhakay ba Bahire?</span>
+            <span class="font-bn block text-emerald">Mama Jaben Proti Gontoobye!</span>
+          </h1>
+
+          <p class="mt-5 text-muted text-lg leading-relaxed max-w-lg">
+            No more waiting or endless haggling. Connect instantly with verified
+            local drivers for safe, transparent, and affordable rides — anywhere
+            in the city.
+          </p>
+
+          <div class="mt-8 flex flex-wrap items-center gap-3.5">
+            <button
+              onclick="openModal('signup', 'passenger')"
+              class="inline-flex items-center gap-2 bg-ink hover:bg-emerald-deep text-white font-semibold text-sm px-6 py-3.5 rounded-lg shadow-soft transition-colors"
+            >
+              Find a Ride
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M5 12h14M13 5l7 7-7 7"
+                  stroke="white"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+            <button
+              onclick="openModal('signup', 'driver')"
+              class="inline-flex items-center gap-2 bg-white hover:bg-clay-light text-clay-dark font-semibold text-sm px-6 py-3.5 rounded-lg border border-clay-ring transition-colors"
+            >
+              Become a Driver
+            </button>
+          </div>
+
+          <div class="mt-10 flex items-center gap-8">
+            <div>
+              <p class="font-display font-bold text-2xl text-ink">50K+</p>
+              <p class="text-xs text-muted mt-0.5">Verified Mamas</p>
+            </div>
+            <div class="w-px h-9 bg-hairline"></div>
+            <div>
+              <p class="font-display font-bold text-2xl text-ink">4.9★</p>
+              <p class="text-xs text-muted mt-0.5">Avg. rating</p>
+            </div>
+            <div class="w-px h-9 bg-hairline"></div>
+            <div>
+              <p class="font-display font-bold text-2xl text-ink">24/7</p>
+              <p class="text-xs text-muted mt-0.5">On the road</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- route preview — ticket-stub signature card -->
+        <div class="max-w-md mx-auto w-full">
+          <div
+            class="ticket bg-white rounded-xl border border-hairline shadow-ticket p-6 sm:p-7"
+          >
+            <div class="flex items-center justify-between">
+              <p class="flex items-center gap-2 text-sm font-medium text-muted">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald"></span>Live route preview
+              </p>
+              <span
+                class="text-[11px] font-semibold text-emerald-dark bg-emerald-light px-2.5 py-1 rounded-full"
+                >ETA 12 min</span
+              >
+            </div>
+
+            <div class="mt-5 space-y-3">
+              <div class="flex items-start gap-3">
+                <span class="w-2 h-2 rounded-full bg-emerald mt-1.5 shrink-0"></span>
+                <div>
+                  <p class="text-[11px] font-semibold text-muted uppercase eyebrow">
+                    Pickup
+                  </p>
+                  <p class="text-sm text-ink font-medium">Dhanmondi 27, Dhaka</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-3">
+                <span class="w-2 h-2 rounded-full bg-clay mt-1.5 shrink-0"></span>
+                <div>
+                  <p class="text-[11px] font-semibold text-muted uppercase eyebrow">
+                    Destination
+                  </p>
+                  <p class="text-sm text-ink font-medium">Bashundhara City Mall</p>
+                </div>
+              </div>
+            </div>
+
+            <svg viewBox="0 0 300 90" class="w-full h-24 mt-4">
+              <path
+                d="M8 74 C 60 78, 90 32, 130 44 S 210 24, 240 34 S 280 16, 292 14"
+                stroke="#0D1420"
+                stroke-width="1.6"
+                stroke-dasharray="4 5"
+                fill="none"
+                stroke-linecap="round"
+                opacity="0.35"
+              />
+              <circle cx="8" cy="74" r="4" fill="#0E7A5A" />
+              <circle cx="292" cy="14" r="5" fill="#9C5A33" />
+            </svg>
+
+            <div class="pt-5 ticket-tear"></div>
+
+            <div class="mt-5 flex items-center justify-between">
+              <div>
+                <p class="text-[11px] text-muted font-mono tracking-wide">FARE ESTIMATE</p>
+                <p class="font-display font-bold text-xl text-ink mt-0.5">
+                  ৳185<span class="text-muted font-medium text-base">–210</span>
+                </p>
+              </div>
+              <button
+                onclick="openModal('signup', 'passenger')"
+                class="inline-flex items-center gap-1.5 bg-ink hover:bg-emerald-deep text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors"
+              >
+                Book Now
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M5 12h14M13 5l7 7-7 7"
+                    stroke="white"
+                    stroke-width="2.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ ONE APP TWO EXPERIENCES ============ -->
+    <section id="for-drivers" class="py-20 lg:py-24">
+      <div class="max-w-7xl mx-auto px-5 sm:px-8">
+        <h2
+          class="text-center font-display font-bold text-3xl sm:text-4xl tracking-tight"
+        >
+          One app. Two winning experiences.
+        </h2>
+
+        <div class="mt-12 grid md:grid-cols-2 gap-6">
+          <!-- passenger card -->
+          <div class="bg-white border border-hairline rounded-xl p-7 sm:p-8">
+            <span
+              class="w-9 h-9 rounded-lg bg-emerald-light grid place-items-center"
+            >
+              <svg class="w-5 h-5 text-emerald-dark" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M17 20v-1.5A3.5 3.5 0 0 0 13.5 15h-3A3.5 3.5 0 0 0 7 18.5V20M15 8.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </span>
+            <p class="mt-4 text-xs font-bold eyebrow text-emerald-dark uppercase">
+              For Passengers
+            </p>
+            <h3 class="mt-1 font-display font-bold text-2xl text-ink">
+              Ride with confidence
+            </h3>
+
+            <ul class="mt-6 space-y-4">
+              <li class="flex gap-3">
+                <svg class="w-5 h-5 text-emerald-dark mt-0.5 shrink-0" viewBox="0 0 24 24" fill="none">
+                  <path d="M4 12.5 9.5 18 20 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <div>
+                  <p class="text-sm font-semibold text-ink">Upfront fare estimate</p>
+                  <p class="text-sm text-muted">See the price range before you book, always.</p>
+                </div>
+              </li>
+              <li class="flex gap-3">
+                <svg class="w-5 h-5 text-emerald-dark mt-0.5 shrink-0" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M12 17.3 6.2 20.5l1.1-6.5L2.5 9.5l6.5-.9L12 2.7l3 5.9 6.5.9-4.8 4.5 1.1 6.5z"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                <div>
+                  <p class="text-sm font-semibold text-ink">Rated & verified drivers</p>
+                  <p class="text-sm text-muted">Every Mama is background-checked and rated.</p>
+                </div>
+              </li>
+              <li class="flex gap-3">
+                <svg class="w-5 h-5 text-emerald-dark mt-0.5 shrink-0" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M9 12l2 2 4-4M12 22c-4.4-1.5-8-5.5-8-10V5l8-3 8 3v7c0 4.5-3.6 8.5-8 10Z"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+                <div>
+                  <p class="text-sm font-semibold text-ink">Cash or digital pay</p>
+                  <p class="text-sm text-muted">bKash, Nagad, card, or good old taka.</p>
+                </div>
+              </li>
+            </ul>
+
+            <button
+              onclick="openModal('signup', 'passenger')"
+              class="mt-7 w-full bg-ink hover:bg-emerald-deep text-white font-semibold text-sm py-3.5 rounded-lg transition-colors"
+            >
+              Sign up as Passenger
+            </button>
+          </div>
+
+          <!-- driver card -->
+          <div class="bg-white border border-hairline rounded-xl p-7 sm:p-8">
+            <span
+              class="w-9 h-9 rounded-lg bg-clay-light grid place-items-center"
+            >
+              <svg class="w-5 h-5 text-clay-dark" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M3 13l1.5-4.5A2 2 0 0 1 6.4 7h11.2a2 2 0 0 1 1.9 1.5L21 13"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                <rect x="3" y="13" width="18" height="6" rx="1.6" stroke="currentColor" stroke-width="2" />
+                <circle cx="7.5" cy="19" r="1.4" fill="currentColor" />
+                <circle cx="16.5" cy="19" r="1.4" fill="currentColor" />
+              </svg>
+            </span>
+            <p class="mt-4 text-xs font-bold eyebrow text-clay-dark uppercase">
+              For Drivers (Mamas)
+            </p>
+            <h3 class="mt-1 font-display font-bold text-2xl text-ink">
+              Earn on your terms
+            </h3>
+
+            <ul class="mt-6 space-y-4">
+              <li class="flex gap-3">
+                <svg class="w-5 h-5 text-clay-dark mt-0.5 shrink-0" viewBox="0 0 24 24" fill="none">
+                  <path d="M3 17l6-6 4 4 8-8M21 7h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <div>
+                  <p class="text-sm font-semibold text-ink">Keep more of your earnings</p>
+                  <p class="text-sm text-muted">Industry-lowest commission rates.</p>
+                </div>
+              </li>
+              <li class="flex gap-3">
+                <svg class="w-5 h-5 text-clay-dark mt-0.5 shrink-0" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" />
+                  <path d="M12 7v5l3.5 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                </svg>
+                <div>
+                  <p class="text-sm font-semibold text-ink">Flexible working hours</p>
+                  <p class="text-sm text-muted">Drive when you want. Take breaks when you need.</p>
+                </div>
+              </li>
+              <li class="flex gap-3">
+                <svg class="w-5 h-5 text-clay-dark mt-0.5 shrink-0" viewBox="0 0 24 24" fill="none">
+                  <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                </svg>
+                <div>
+                  <p class="text-sm font-semibold text-ink">Instant ride requests</p>
+                  <p class="text-sm text-muted">Smart matching keeps your car full, not idle.</p>
+                </div>
+              </li>
+              <li class="flex gap-3">
+                <svg class="w-5 h-5 text-clay-dark mt-0.5 shrink-0" viewBox="0 0 24 24" fill="none">
+                  <rect x="2" y="6" width="20" height="13" rx="2.5" stroke="currentColor" stroke-width="2" />
+                  <path d="M2 10.5h20" stroke="currentColor" stroke-width="2" />
+                </svg>
+                <div>
+                  <p class="text-sm font-semibold text-ink">Fast, weekly payouts</p>
+                  <p class="text-sm text-muted">Direct to your bKash or bank — no delays.</p>
+                </div>
+              </li>
+            </ul>
+
+            <button
+              onclick="openModal('signup', 'driver')"
+              class="mt-7 w-full bg-clay-dark hover:bg-clay text-white font-semibold text-sm py-3.5 rounded-lg transition-colors"
+            >
+              Register as Driver Mama
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ HOW IT WORKS (3 taps) ============ -->
+    <section id="how-it-works" class="py-20 lg:py-24 bg-white border-y border-hairline">
+      <div class="max-w-7xl mx-auto px-5 sm:px-8">
+        <div class="text-center max-w-xl mx-auto">
+          <p class="text-xs font-bold eyebrow text-clay-dark uppercase">How it Works</p>
+          <h2 class="mt-3 font-display font-bold text-3xl sm:text-4xl tracking-tight">
+            Three taps to your next ride
+          </h2>
+          <p class="mt-3 text-muted">Simple by design. Fast by default. Fair by promise.</p>
+        </div>
+
+        <div class="mt-12 grid md:grid-cols-3 gap-6 relative">
+          <div
+            class="hidden md:block absolute top-[52px] left-[16.5%] right-[16.5%] border-t border-dashed border-hairline"
+          ></div>
+
+          <div class="relative bg-panel rounded-xl p-7">
+            <div class="flex items-start justify-between">
+              <span class="w-10 h-10 rounded-lg bg-white border border-hairline grid place-items-center">
+                <svg class="w-5 h-5 text-emerald-dark" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 22s7-7.58 7-12.5A7 7 0 0 0 5 9.5C5 14.42 12 22 12 22Z" stroke="currentColor" stroke-width="2" />
+                  <circle cx="12" cy="9.5" r="2.4" fill="currentColor" />
+                </svg>
+              </span>
+              <span class="text-xs font-mono font-semibold text-muted bg-white border border-hairline px-2 py-1 rounded-md">01</span>
+            </div>
+            <h3 class="mt-5 font-display font-semibold text-lg text-ink">Set pickup & destination</h3>
+            <p class="mt-2 text-sm text-muted leading-relaxed">
+              Type in where you are and where you're headed. See the fare upfront.
+            </p>
+          </div>
+
+          <div class="relative bg-panel rounded-xl p-7">
+            <div class="flex items-start justify-between">
+              <span class="w-10 h-10 rounded-lg bg-white border border-hairline grid place-items-center">
+                <svg class="w-5 h-5 text-emerald-dark" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M3 13l1.5-4.5A2 2 0 0 1 6.4 7h11.2a2 2 0 0 1 1.9 1.5L21 13"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <rect x="3" y="13" width="18" height="6" rx="1.6" stroke="currentColor" stroke-width="2" />
+                </svg>
+              </span>
+              <span class="text-xs font-mono font-semibold text-muted bg-white border border-hairline px-2 py-1 rounded-md">02</span>
+            </div>
+            <h3 class="mt-5 font-display font-semibold text-lg text-ink">Get matched in seconds</h3>
+            <p class="mt-2 text-sm text-muted leading-relaxed">
+              Our smart engine finds the nearest verified Mama for your route.
+            </p>
+          </div>
+
+          <div class="relative bg-panel rounded-xl p-7">
+            <div class="flex items-start justify-between">
+              <span class="w-10 h-10 rounded-lg bg-white border border-hairline grid place-items-center">
+                <svg class="w-5 h-5 text-emerald-dark" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <span class="text-xs font-mono font-semibold text-muted bg-white border border-hairline px-2 py-1 rounded-md">03</span>
+            </div>
+            <h3 class="mt-5 font-display font-semibold text-lg text-ink">Ride safe & pay easy</h3>
+            <p class="mt-2 text-sm text-muted leading-relaxed">
+              Track live, arrive relaxed, and pay by cash, bKash, Nagad, or card.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ FEATURE HIGHLIGHTS ============ -->
+    <section id="features" class="py-20 lg:py-24">
+      <div class="max-w-7xl mx-auto px-5 sm:px-8">
+        <div class="text-center max-w-xl mx-auto">
+          <p class="text-xs font-bold eyebrow text-emerald-dark uppercase">Feature Highlights</p>
+          <h2 class="mt-3 font-display font-bold text-3xl sm:text-4xl tracking-tight">
+            Everything you need in one ride
+          </h2>
+        </div>
+
+        <div class="mt-12 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div class="bg-white border border-hairline rounded-xl p-6">
+            <div class="w-10 h-10 rounded-lg bg-emerald-light grid place-items-center">
+              <svg class="w-5 h-5 text-emerald-dark" viewBox="0 0 24 24" fill="none">
+                <rect x="2" y="7" width="20" height="12" rx="2.5" stroke="currentColor" stroke-width="2" />
+                <circle cx="12" cy="13" r="2.5" stroke="currentColor" stroke-width="2" />
+              </svg>
+            </div>
+            <h3 class="mt-4 font-display font-semibold text-ink">Upfront Fare Estimate</h3>
+            <p class="mt-1.5 text-sm text-muted">See exact fare range before you book — no hidden surprises.</p>
+          </div>
+          <div class="bg-white border border-hairline rounded-xl p-6">
+            <div class="w-10 h-10 rounded-lg bg-emerald-light grid place-items-center">
+              <svg class="w-5 h-5 text-emerald-dark" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 20l1-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </div>
+            <h3 class="mt-4 font-display font-semibold text-ink">Driver Rating & Reviews</h3>
+            <p class="mt-1.5 text-sm text-muted">Rate your Mama and read honest reviews from other riders.</p>
+          </div>
+          <div class="bg-white border border-hairline rounded-xl p-6">
+            <div class="w-10 h-10 rounded-lg bg-emerald-light grid place-items-center">
+              <svg class="w-5 h-5 text-emerald-dark" viewBox="0 0 24 24" fill="none">
+                <rect x="2" y="5" width="20" height="14" rx="2.5" stroke="currentColor" stroke-width="2" />
+                <path d="M2 10h20" stroke="currentColor" stroke-width="2" />
+              </svg>
+            </div>
+            <h3 class="mt-4 font-display font-semibold text-ink">Digital Payments</h3>
+            <p class="mt-1.5 text-sm text-muted">Pay via bKash, Nagad, card, or cash. Your choice, every ride.</p>
+          </div>
+          <div class="bg-white border border-hairline rounded-xl p-6">
+            <div class="w-10 h-10 rounded-lg bg-emerald-light grid place-items-center">
+              <svg class="w-5 h-5 text-emerald-dark" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M9 5H5a2 2 0 0 0-2 2v4m6-6 4 4-4 4M15 19h4a2 2 0 0 0 2-2v-4m-6 6-4-4 4-4"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </div>
+            <h3 class="mt-4 font-display font-semibold text-ink">Promo Coupons</h3>
+            <p class="mt-1.5 text-sm text-muted">Apply discount codes and save on every trip you take.</p>
+          </div>
+          <div class="bg-white border border-hairline rounded-xl p-6">
+            <div class="w-10 h-10 rounded-lg bg-emerald-light grid place-items-center">
+              <svg class="w-5 h-5 text-emerald-dark" viewBox="0 0 24 24" fill="none">
+                <circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="2" />
+                <circle cx="17" cy="16" r="3" stroke="currentColor" stroke-width="2" />
+                <path d="M10.5 9.5 14.5 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              </svg>
+            </div>
+            <h3 class="mt-4 font-display font-semibold text-ink">Share Ride</h3>
+            <p class="mt-1.5 text-sm text-muted">Share your live trip with family for extra safety and peace of mind.</p>
+          </div>
+          <div class="bg-ink rounded-xl p-6">
+            <div class="w-10 h-10 rounded-lg bg-white/10 grid place-items-center">
+              <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none">
+                <path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+              </svg>
+            </div>
+            <h3 class="mt-4 font-display font-semibold text-white">Verified Community</h3>
+            <p class="mt-1.5 text-sm text-white/60">Background-checked drivers, monitored trips, and 24/7 support.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DRIVER ONBOARDING ============ -->
+    <section class="py-20 lg:py-24 bg-white border-y border-hairline">
+      <div class="max-w-7xl mx-auto px-5 sm:px-8">
+        <div class="text-center max-w-xl mx-auto">
+          <p class="text-xs font-bold eyebrow text-clay-dark uppercase">Driver Onboarding</p>
+          <h2 class="mt-3 font-display font-bold text-3xl sm:text-4xl tracking-tight">
+            From sign-up to first ride in 3 steps
+          </h2>
+          <p class="mt-3 text-muted">A simple, verified path to becoming a Mama Jaben? partner.</p>
+        </div>
+
+        <div class="mt-12 grid md:grid-cols-3 gap-6 relative">
+          <div
+            class="hidden md:block absolute top-[52px] left-[16.5%] right-[16.5%] border-t border-dashed border-hairline"
+          ></div>
+
+          <div class="relative bg-panel rounded-xl p-7">
+            <div class="flex items-start justify-between">
+              <span class="w-10 h-10 rounded-lg bg-white border border-hairline grid place-items-center">
+                <svg class="w-5 h-5 text-clay-dark" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M9 12l2 2 4-4M7 4h10a1 1 0 0 1 1 1v15l-2-1.5L14 20l-2-1.5L10 20l-2-1.5L6 20V5a1 1 0 0 1 1-1Z"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </span>
+              <span class="text-xs font-mono font-semibold text-muted bg-white border border-hairline px-2 py-1 rounded-md">01</span>
+            </div>
+            <h3 class="mt-5 font-display font-semibold text-lg text-ink">Submit Info & Driving License</h3>
+            <p class="mt-2 text-sm text-muted leading-relaxed">
+              Fill in your details and upload your driving license photo.
+            </p>
+          </div>
+
+          <div class="relative bg-panel rounded-xl p-7">
+            <div class="flex items-start justify-between">
+              <span class="w-10 h-10 rounded-lg bg-white border border-hairline grid place-items-center">
+                <svg class="w-5 h-5 text-clay-dark" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="8" r="3.2" stroke="currentColor" stroke-width="2" />
+                  <path d="M5 20c.7-3.4 3.4-5.5 7-5.5S18.3 16.6 19 20" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                </svg>
+              </span>
+              <span class="text-xs font-mono font-semibold text-muted bg-white border border-hairline px-2 py-1 rounded-md">02</span>
+            </div>
+            <h3 class="mt-5 font-display font-semibold text-lg text-ink">Admin Approval</h3>
+            <p class="mt-2 text-sm text-muted leading-relaxed">
+              Our team verifies your documents. You'll be notified within 24–48 hours.
+            </p>
+          </div>
+
+          <div class="relative bg-panel rounded-xl p-7">
+            <div class="flex items-start justify-between">
+              <span class="w-10 h-10 rounded-lg bg-white border border-hairline grid place-items-center">
+                <svg class="w-5 h-5 text-clay-dark" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M3 16V8a1.5 1.5 0 0 1 1.5-1.5h9A1.5 1.5 0 0 1 15 8v8M3 16h12M3 16a2 2 0 1 0 4 0M11 16a2 2 0 1 0 4 0M15 10.5h3.2a1.5 1.5 0 0 1 1.3.75L21 14v2h-2"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </span>
+              <span class="text-xs font-mono font-semibold text-muted bg-white border border-hairline px-2 py-1 rounded-md">03</span>
+            </div>
+            <h3 class="mt-5 font-display font-semibold text-lg text-ink">Register Vehicle & Earn</h3>
+            <p class="mt-2 text-sm text-muted leading-relaxed">
+              Add your vehicle info & photos, go online, and start accepting rides.
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-10 text-center">
+          <button
+            onclick="openModal('signup', 'driver')"
+            class="inline-flex items-center gap-2 bg-clay-dark hover:bg-clay text-white font-semibold text-sm px-7 py-3.5 rounded-lg shadow-soft transition-colors"
+          >
+            Start Driver Registration
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ SAFETY ============ -->
+    <section id="safety" class="py-20 lg:py-24">
+      <div class="max-w-7xl mx-auto px-5 sm:px-8 grid lg:grid-cols-2 gap-14 items-center">
+        <div>
+          <p class="text-xs font-bold eyebrow text-emerald-dark uppercase">Safety First</p>
+          <h2 class="mt-3 font-display font-bold text-3xl sm:text-4xl tracking-tight">
+            Every ride is watched over.
+          </h2>
+          <p class="mt-3 text-muted leading-relaxed max-w-lg">
+            We built Mama Jaben? with safety at its core — because your peace of mind is the ride we care about most.
+          </p>
+
+          <div class="mt-8 space-y-6">
+            <div class="flex gap-4">
+              <span class="w-10 h-10 rounded-lg bg-emerald-light grid place-items-center shrink-0">
+                <svg class="w-5 h-5 text-emerald-dark" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <div>
+                <p class="font-semibold text-ink">Verified drivers</p>
+                <p class="text-sm text-muted mt-0.5">
+                  Every Mama goes through document, license and background checks before joining.
+                </p>
+              </div>
+            </div>
+            <div class="flex gap-4">
+              <span class="w-10 h-10 rounded-lg bg-emerald-light grid place-items-center shrink-0">
+                <svg class="w-5 h-5 text-emerald-dark" viewBox="0 0 24 24" fill="none">
+                  <path d="M3 11l18-7-7 18-2.5-7L3 11Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <div>
+                <p class="font-semibold text-ink">Live trip sharing</p>
+                <p class="text-sm text-muted mt-0.5">
+                  Share your route with family in one tap — for the whole trip.
+                </p>
+              </div>
+            </div>
+            <div class="flex gap-4">
+              <span class="w-10 h-10 rounded-lg bg-emerald-light grid place-items-center shrink-0">
+                <svg class="w-5 h-5 text-emerald-dark" viewBox="0 0 24 24" fill="none">
+                  <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                </svg>
+              </span>
+              <div>
+                <p class="font-semibold text-ink">SOS at your fingertip</p>
+                <p class="text-sm text-muted mt-0.5">
+                  24/7 emergency support button connects you to help instantly.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white border border-hairline rounded-xl p-6 sm:p-7 max-w-md mx-auto w-full">
+          <div class="flex items-center justify-between">
+            <p class="text-[11px] font-bold eyebrow text-muted uppercase">Ride in progress</p>
+            <span class="text-xs font-semibold text-ink bg-panel px-2.5 py-1 rounded-full flex items-center gap-1">★ 4.94</span>
+          </div>
+          <h3 class="mt-2 font-display font-semibold text-lg text-ink">Karim Mama · Toyota Axio</h3>
+
+          <div class="mt-5 grid grid-cols-3 gap-3">
+            <div class="bg-panel rounded-lg p-3.5 text-center">
+              <p class="font-display font-bold text-ink">DHA-1234</p>
+              <p class="text-[11px] text-muted mt-0.5">License</p>
+            </div>
+            <div class="bg-panel rounded-lg p-3.5 text-center">
+              <p class="font-display font-bold text-ink">3.2 km</p>
+              <p class="text-[11px] text-muted mt-0.5">Distance</p>
+            </div>
+            <div class="bg-panel rounded-lg p-3.5 text-center">
+              <p class="font-display font-bold text-ink">৳210</p>
+              <p class="text-[11px] text-muted mt-0.5">Fare</p>
+            </div>
+          </div>
+
+          <div class="mt-5 flex gap-3">
+            <button class="flex-1 bg-ink hover:bg-emerald-deep text-white font-semibold text-sm py-3 rounded-lg transition-colors">
+              Share trip
+            </button>
+            <button class="flex-1 bg-white text-red-700 font-semibold text-sm py-3 rounded-lg border border-red-200 hover:bg-red-50 transition-colors">
+              SOS
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ FOOTER ============ -->
+    <footer class="bg-white border-t border-hairline">
+      <div class="max-w-7xl mx-auto px-5 sm:px-8 py-14">
+        <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-10">
+          <div>
+            <a href="#top" class="flex items-center gap-2.5">
+              <span class="w-9 h-9 grid place-items-center rounded-lg bg-ink">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 22s7-7.58 7-12.5A7 7 0 0 0 5 9.5C5 14.42 12 22 12 22Z" fill="white" />
+                  <circle cx="12" cy="9.5" r="2.6" fill="#0D1420" />
+                </svg>
+              </span>
+              <span class="font-display font-bold text-ink">Mama <span class="text-emerald">Jaben?</span></span>
+            </a>
+            <p class="mt-4 text-sm text-muted leading-relaxed max-w-xs">
+              Bangladesh's homegrown ride-sharing network. Fair fares, verified Mamas, and rides that just… work.
+            </p>
+            <p class="mt-4 text-sm text-muted flex items-center gap-2">
+              <svg class="w-4 h-4 text-muted" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 2 .7 2.9a2 2 0 0 1-.4 2.1L8 10a16 16 0 0 0 6 6l1.3-1.4a2 2 0 0 1 2.1-.4c.9.4 1.9.6 2.9.7a2 2 0 0 1 1.7 2Z"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                />
+              </svg>
+              +880 9678-000000
+              <span class="text-hairline">·</span>
+              <svg class="w-4 h-4 text-muted" viewBox="0 0 24 24" fill="none">
+                <rect x="2" y="4" width="20" height="16" rx="2" stroke="currentColor" stroke-width="1.6" />
+                <path d="M2 6l10 7 10-7" stroke="currentColor" stroke-width="1.6" />
+              </svg>
+              hello@mamajaben.com.bd
+            </p>
+            <div class="mt-5 flex items-center gap-3">
+              <a href="#" class="w-9 h-9 rounded-full border border-hairline grid place-items-center text-muted hover:text-emerald-dark hover:border-emerald-ring transition-colors">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.4h-1.3c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.4v7A10 10 0 0 0 22 12Z" />
+                </svg>
+              </a>
+              <a href="#" class="w-9 h-9 rounded-full border border-hairline grid place-items-center text-muted hover:text-emerald-dark hover:border-emerald-ring transition-colors">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.9 3H21l-6.4 7.3L22.2 21h-5.9l-4.6-6-5.3 6H3.4l6.9-7.8L2.1 3H8.1l4.2 5.5L18.9 3Z" />
+                </svg>
+              </a>
+              <a href="#" class="w-9 h-9 rounded-full border border-hairline grid place-items-center text-muted hover:text-emerald-dark hover:border-emerald-ring transition-colors">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2.2c2.7 0 3 .01 4.1.06 1.1.05 1.8.22 2.2.36.55.22.95.47 1.36.88.42.42.66.81.88 1.36.15.4.32 1.1.36 2.2.05 1.13.06 1.46.06 4.1 0 2.7-.01 3-.06 4.1-.05 1.1-.22 1.8-.36 2.2-.22.55-.47.95-.88 1.36-.42.42-.81.66-1.36.88-.4.15-1.1.32-2.2.36-1.13.05-1.46.06-4.1.06-2.7 0-3-.01-4.1-.06-1.1-.05-1.8-.22-2.2-.36a3.7 3.7 0 0 1-1.36-.88 3.7 3.7 0 0 1-.88-1.36c-.15-.4-.32-1.1-.34-2.2-.05-1.04-.06-1.35-.06-4s.01-2.96.06-4c.04-.97.2-1.5.34-1.85.18-.46.4-.8.75-1.15.35-.35.68-.57 1.15-.75.35-.14.88-.3 1.85-.34C9 2.21 9.35 2.2 12 2.2Zm0 1.8c-2.65 0-2.96.01-4 .06-.97.04-1.5.2-1.85.34-.46.18-.8.4-1.15.75-.35.35-.57.68-.75 1.15-.14.35-.3.88-.34 1.85-.05 1.04-.06 1.35-.06 4s.01 2.96.06 4c.04.97.2 1.5.34 1.85.18.46.4.8.75 1.15.35.35.68.57 1.15.75.35.14.88.3 1.85.34 1.04.05 1.35.06 4 .06s2.96-.01 4-.06c.97-.04 1.5-.2 1.85-.34.46-.18.8-.4 1.15-.75.35-.35.57-.68.75-1.15.14-.35.3-.88.34-1.85.05-1.04.06-1.35.06-4s-.01-2.96-.06-4c-.04-.97-.2-1.5-.34-1.85a2.9 2.9 0 0 0-.75-1.15 2.9 2.9 0 0 0-1.15-.75c-.35-.14-.88-.3-1.85-.34-1.04-.05-1.35-.06-4-.06Zm0 3.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9Zm0 1.8a2.7 2.7 0 1 0 0 5.4 2.7 2.7 0 0 0 0-5.4Zm5.7-2a1.05 1.05 0 1 1-2.1 0 1.05 1.05 0 0 1 2.1 0Z" />
+                </svg>
+              </a>
+              <a href="#" class="w-9 h-9 rounded-full border border-hairline grid place-items-center text-muted hover:text-emerald-dark hover:border-emerald-ring transition-colors">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M23 7.2a3 3 0 0 0-2.1-2.1C19.1 4.6 12 4.6 12 4.6s-7.1 0-8.9.5A3 3 0 0 0 1 7.2 31 31 0 0 0 .6 12a31 31 0 0 0 .4 4.8 3 3 0 0 0 2.1 2.1c1.8.5 8.9.5 8.9.5s7.1 0 8.9-.5a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .4-4.8 31 31 0 0 0-.4-4.8ZM9.8 15.3V8.7l6 3.3-6 3.3Z" />
+                </svg>
+              </a>
+            </div>
+          </div>
+
+          <div>
+            <p class="text-xs font-bold eyebrow text-muted uppercase mb-4">Company</p>
+            <ul class="space-y-2.5 text-sm text-muted">
+              <li><a href="#" class="hover:text-emerald-dark transition-colors">About</a></li>
+              <li><a href="#" class="hover:text-emerald-dark transition-colors">Careers</a></li>
+              <li><a href="#" class="hover:text-emerald-dark transition-colors">Press</a></li>
+              <li><a href="#" class="hover:text-emerald-dark transition-colors">Blog</a></li>
+            </ul>
+          </div>
+
+          <div>
+            <p class="text-xs font-bold eyebrow text-muted uppercase mb-4">Product</p>
+            <ul class="space-y-2.5 text-sm text-muted">
+              <li><a href="#how-it-works" class="hover:text-emerald-dark transition-colors">How it works</a></li>
+              <li><a href="#for-drivers" class="hover:text-emerald-dark transition-colors">For Drivers</a></li>
+              <li><a href="#safety" class="hover:text-emerald-dark transition-colors">Safety</a></li>
+              <li><a href="#" class="hover:text-emerald-dark transition-colors">Cities</a></li>
+            </ul>
+          </div>
+
+          <div>
+            <p class="text-xs font-bold eyebrow text-muted uppercase mb-4">Support</p>
+            <ul class="space-y-2.5 text-sm text-muted">
+              <li><a href="#" class="hover:text-emerald-dark transition-colors">Help Center</a></li>
+              <li><a href="#" class="hover:text-emerald-dark transition-colors">Contact</a></li>
+              <li><a href="#" class="hover:text-emerald-dark transition-colors">Privacy Policy</a></li>
+              <li><a href="#" class="hover:text-emerald-dark transition-colors">Terms</a></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="mt-12 pt-6 border-t border-hairline flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p class="text-xs text-muted">© 2026 Mama Jaben? Technologies. All rights reserved.</p>
+          <p class="text-xs text-muted">Made with 💚 in Dhaka, Bangladesh</p>
+        </div>
+      </div>
+    </footer>
+
+    <!-- ============ LOGIN MODAL ============ -->
+    <div id="loginOverlay" class="modal-overlay">
+      <div class="bg-white rounded-xl shadow-modal max-w-sm w-full p-7 relative">
+        <button
+          onclick="closeModals()"
+          class="absolute right-5 top-5 w-8 h-8 grid place-items-center rounded-full hover:bg-panel text-muted"
+        >
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none">
+            <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+        <h3 class="font-display font-bold text-xl text-ink">Welcome back, Mama!</h3>
+
+        <div class="mt-5 inline-flex bg-panel rounded-lg p-1 w-full">
+          <button
+            class="seg-btn flex-1 text-sm font-semibold py-2 rounded-md transition-colors"
+            data-modal="login"
+            data-role="passenger"
+            data-color="green"
+            data-active="true"
+            type="button"
+            onclick="setModalTab('login', 'passenger')"
+          >
+            Passenger
+          </button>
+          <button
+            class="seg-btn flex-1 text-sm font-semibold py-2 rounded-md transition-colors"
+            data-modal="login"
+            data-role="driver"
+            data-color="clay"
+            data-active="false"
+            type="button"
+            onclick="setModalTab('login', 'driver')"
+          >
+            Driver
+          </button>
+        </div>
+
+        {% if messages %}
+        <div class="mt-4 space-y-2">
+          {% for message in messages %}
+          <div class="text-sm rounded-lg px-4 py-2.5 border {% if message.tags == 'error' %}bg-red-50 border-red-200 text-red-700{% else %}bg-emerald-light border-emerald-ring text-emerald-dark{% endif %}">
+            {{ message }}
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <form
+          id="loginForm"
+          method="POST"
+          action="{% url 'login' %}"
+          class="mt-5 space-y-4"
+        >
+          {% csrf_token %}
+          <input type="hidden" name="role" id="loginRoleField" value="passenger" />
+          <div>
+            <label for="loginUsername" class="block text-xs font-semibold text-muted mb-1.5">Email</label>
+            <input
+              id="loginUsername"
+              type="email"
+              name="email"
+              placeholder="you@example.com"
+              required
+              class="w-full px-4 py-3 rounded-lg border border-hairline text-sm placeholder:text-muted"
+            />
+          </div>
+          <div>
+            <label for="loginPassword" class="block text-xs font-semibold text-muted mb-1.5">Password</label>
+            <input
+              id="loginPassword"
+              type="password"
+              name="password"
+              placeholder="••••••••"
+              required
+              class="w-full px-4 py-3 rounded-lg border border-hairline text-sm placeholder:text-muted"
+            />
+          </div>
+
+          <button
+            id="loginSubmitBtn"
+            type="submit"
+            class="mt-2 w-full bg-ink hover:bg-emerald-deep text-white font-semibold text-sm py-3.5 rounded-lg transition-colors"
+          >
+            Log in as Passenger
+          </button>
+        </form>
+        <p class="mt-4 text-center text-xs text-muted">
+          New to Mama Jaben?
+          <button onclick="openModal('signup')" class="text-emerald-dark font-semibold">Sign up</button>
+        </p>
+      </div>
+    </div>
+
+    <!-- ============ SIGN UP MODAL ============ -->
+    <div id="signupOverlay" class="modal-overlay">
+      <div class="bg-white rounded-xl shadow-modal max-w-sm w-full p-7 relative max-h-[90vh] overflow-y-auto">
+        <button
+          onclick="closeModals()"
+          class="absolute right-5 top-5 w-8 h-8 grid place-items-center rounded-full hover:bg-panel text-muted"
+        >
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none">
+            <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+        <h3 class="font-display font-bold text-xl text-ink">Create your account, Mama!</h3>
+
+        <div class="mt-5 inline-flex bg-panel rounded-lg p-1 w-full">
+          <button
+            class="seg-btn flex-1 text-sm font-semibold py-2 rounded-md transition-colors"
+            data-modal="signup"
+            data-role="passenger"
+            data-color="green"
+            data-active="true"
+            type="button"
+            onclick="setModalTab('signup', 'passenger')"
+          >
+            Passenger
+          </button>
+          <button
+            class="seg-btn flex-1 text-sm font-semibold py-2 rounded-md transition-colors"
+            data-modal="signup"
+            data-role="driver"
+            data-color="clay"
+            data-active="false"
+            type="button"
+            onclick="setModalTab('signup', 'driver')"
+          >
+            Driver
+          </button>
+        </div>
+
+        {% if messages %}
+        <div class="mt-4 space-y-2">
+          {% for message in messages %}
+          <div class="text-sm rounded-lg px-4 py-2.5 border {% if message.tags == 'error' %}bg-red-50 border-red-200 text-red-700{% else %}bg-emerald-light border-emerald-ring text-emerald-dark{% endif %}">
+            {{ message }}
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- passenger signup form -->
+        <form
+          id="signupPassengerForm"
+          method="POST"
+          action="{% url 'signup_passenger' %}"
+          class="mt-5 space-y-4"
+        >
+          {% csrf_token %}
+          <div>
+            <label for="passengerFullName" class="block text-xs font-semibold text-muted mb-1.5">Full Name</label>
+            <input
+              id="passengerFullName"
+              type="text"
+              name="name"
+              placeholder="e.g. Nusrat Jahan"
+              required
+              class="w-full px-4 py-3 rounded-lg border border-hairline text-sm placeholder:text-muted"
+            />
+          </div>
+          <div>
+            <label for="passengerPhone" class="block text-xs font-semibold text-muted mb-1.5">Phone Number</label>
+            <input
+              id="passengerPhone"
+              type="tel"
+              name="phone"
+              placeholder="01XXXXXXXXX"
+              required
+              class="w-full px-4 py-3 rounded-lg border border-hairline text-sm placeholder:text-muted"
+            />
+          </div>
+          <div>
+            <label for="passengerEmail" class="block text-xs font-semibold text-muted mb-1.5">Email</label>
+            <input
+              id="passengerEmail"
+              type="email"
+              name="email"
+              placeholder="you@example.com"
+              required
+              class="w-full px-4 py-3 rounded-lg border border-hairline text-sm placeholder:text-muted"
+            />
+          </div>
+          <div>
+            <label for="passengerPassword" class="block text-xs font-semibold text-muted mb-1.5">Password</label>
+            <input
+              id="passengerPassword"
+              type="password"
+              name="password"
+              placeholder="••••••••"
+              required
+              class="w-full px-4 py-3 rounded-lg border border-hairline text-sm placeholder:text-muted"
+            />
+          </div>
+
+          <button
+            id="signupPassengerSubmitBtn"
+            type="submit"
+            class="mt-2 w-full bg-ink hover:bg-emerald-deep text-white font-semibold text-sm py-3.5 rounded-lg transition-colors"
+          >
+            Sign up as Passenger
+          </button>
+        </form>
+
+        <!-- driver signup form -->
+        <form
+          id="signupDriverForm"
+          method="POST"
+          action="{% url 'signup_driver' %}"
+          enctype="multipart/form-data"
+          class="hidden mt-5 space-y-4"
+        >
+          {% csrf_token %}
+          <div>
+            <label for="driverFullName" class="block text-xs font-semibold text-muted mb-1.5">Full Name</label>
+            <input
+              id="driverFullName"
+              type="text"
+              name="name"
+              placeholder="e.g. Karim Hossain"
+              required
+              class="w-full px-4 py-3 rounded-lg border border-hairline text-sm placeholder:text-muted"
+            />
+          </div>
+          <div>
+            <label for="driverPhone" class="block text-xs font-semibold text-muted mb-1.5">Phone Number</label>
+            <input
+              id="driverPhone"
+              type="tel"
+              name="phone"
+              placeholder="01XXXXXXXXX"
+              required
+              class="w-full px-4 py-3 rounded-lg border border-hairline text-sm placeholder:text-muted"
+            />
+          </div>
+          <div>
+            <label for="driverEmail" class="block text-xs font-semibold text-muted mb-1.5">Email</label>
+            <input
+              id="driverEmail"
+              type="email"
+              name="email"
+              placeholder="you@example.com"
+              required
+              class="w-full px-4 py-3 rounded-lg border border-hairline text-sm placeholder:text-muted"
+            />
+          </div>
+          <div>
+            <label for="driverPassword" class="block text-xs font-semibold text-muted mb-1.5">Password</label>
+            <input
+              id="driverPassword"
+              type="password"
+              name="password"
+              placeholder="••••••••"
+              required
+              class="w-full px-4 py-3 rounded-lg border border-hairline text-sm placeholder:text-muted"
+            />
+          </div>
+          <div>
+            <label for="driverLicenseNumber" class="block text-xs font-semibold text-muted mb-1.5">Driving License Number</label>
+            <input
+              id="driverLicenseNumber"
+              type="text"
+              name="license_no"
+              placeholder="DL-XXXXXXXXXX"
+              required
+              class="w-full px-4 py-3 rounded-lg border border-hairline text-sm placeholder:text-muted"
+            />
+          </div>
+          <div>
+            <label for="driverLicensePhoto" class="block text-xs font-semibold text-muted mb-1.5">Driving License Photo</label>
+            <label
+              class="flex items-center justify-between gap-2 w-full px-4 py-3 rounded-lg border border-dashed border-hairline text-sm text-muted cursor-pointer hover:border-clay hover:text-clay-dark transition-colors"
+            >
+              <span id="driverLicensePhotoLabel">Upload image</span>
+              <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
+                <path d="M12 16V4m0 0L7 9m5-5l5 5M5 20h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <input
+                id="driverLicensePhoto"
+                type="file"
+                name="license_image"
+                accept="image/*"
+                required
+                class="hidden"
+                onchange="document.getElementById('driverLicensePhotoLabel').textContent = this.files[0] ? this.files[0].name : 'Upload image'"
+              />
+            </label>
+          </div>
+          <div class="flex items-start gap-2.5 bg-clay-light border border-clay-ring rounded-lg px-4 py-3">
+            <svg class="w-4 h-4 text-clay-dark mt-0.5 shrink-0" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 9v4m0 4h.01M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.4 0Z"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <p class="text-xs text-clay-dark leading-relaxed">
+              Note: After submitting, your application goes to Admin for verification. Once approved, you can register your vehicle.
+            </p>
+          </div>
+
+          <button
+            id="signupDriverSubmitBtn"
+            type="submit"
+            class="mt-2 w-full bg-clay-dark hover:bg-clay text-white font-semibold text-sm py-3.5 rounded-lg transition-colors"
+          >
+            Submit Driver Application
+          </button>
+        </form>
+
+        <p class="mt-4 text-center text-xs text-muted">
+          Already have an account?
+          <button onclick="openModal('login')" class="text-emerald-dark font-semibold">Log in</button>
+        </p>
+      </div>
+    </div>
+
+    <script>
+      document.getElementById("mobileMenuBtn").addEventListener("click", () => {
+        document.getElementById("mobileMenu").classList.toggle("hidden");
+      });
+
+      function openModal(kind, role) {
+        closeModals();
+        document.getElementById(kind + "Overlay").classList.add("open");
+        setModalTab(kind, role || "passenger");
+      }
+      function closeModals() {
+        document.getElementById("loginOverlay").classList.remove("open");
+        document.getElementById("signupOverlay").classList.remove("open");
+      }
+      document.querySelectorAll(".modal-overlay").forEach((ov) => {
+        ov.addEventListener("click", (e) => {
+          if (e.target === ov) closeModals();
+        });
+      });
+
+      function setModalTab(modal, role) {
+        document
+          .querySelectorAll('.seg-btn[data-modal="' + modal + '"]')
+          .forEach((btn) => {
+            btn.setAttribute(
+              "data-active",
+              btn.getAttribute("data-role") === role ? "true" : "false",
+            );
+          });
+
+        if (modal === "login") {
+          document.getElementById("loginRoleField").value = role;
+          const form = document.getElementById("loginForm");
+          const btn = document.getElementById("loginSubmitBtn");
+          if (role === "driver") {
+            form.setAttribute("action", "{% url 'login' %}?role=driver");
+            btn.textContent = "Log in as Driver";
+            btn.className =
+              "mt-2 w-full bg-clay-dark hover:bg-clay text-white font-semibold text-sm py-3.5 rounded-lg transition-colors";
+          } else {
+            form.setAttribute("action", "{% url 'login' %}");
+            btn.textContent = "Log in as Passenger";
+            btn.className =
+              "mt-2 w-full bg-ink hover:bg-emerald-deep text-white font-semibold text-sm py-3.5 rounded-lg transition-colors";
+          }
+        }
+
+        if (modal === "signup") {
+          document
+            .getElementById("signupPassengerForm")
+            .classList.toggle("hidden", role !== "passenger");
+          document
+            .getElementById("signupDriverForm")
+            .classList.toggle("hidden", role !== "driver");
+        }
+      }
+    </script>
+  </body>
+</html>
+

@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Driver Dashboard — Mama Jaben?</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              ink: "#0D1420",
+              muted: "#5B6472",
+              card: "#FFFFFF",
+              emerald: { DEFAULT: "#0E7A5A", dark: "#0A5E45", deep: "#0B3B2C", light: "#E7F3EC", ring: "#BFDECC" },
+              clay: { DEFAULT: "#9C5A33", dark: "#7E4826", light: "#F3EAE1", ring: "#E1CBB4" },
+              hairline: "rgba(13,20,32,0.09)",
+            },
+            fontFamily: {
+              display: ["Sora", "sans-serif"],
+              body: ["Inter", "sans-serif"],
+            },
+            boxShadow: {
+              soft: "0 1px 2px rgba(13,20,32,0.04), 0 10px 26px -14px rgba(13,20,32,0.22)",
+              softer: "0 1px 1px rgba(13,20,32,0.03), 0 2px 8px -3px rgba(13,20,32,0.08)",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      body { background: #f6f7f8; }
+    </style>
+  </head>
+  <body class="font-body text-ink antialiased">
+    <!-- ============ NAVBAR ============ -->
+    <header class="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-hairline">
+      <div class="max-w-3xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
+        <a href="{% url 'driver_dashboard' %}" class="flex items-center gap-2.5">
+          <span class="relative w-9 h-9 grid place-items-center rounded-lg bg-ink">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+              <path d="M12 22s7-7.58 7-12.5A7 7 0 0 0 5 9.5C5 14.42 12 22 12 22Z" fill="white" />
+              <circle cx="12" cy="9.5" r="2.6" fill="#0D1420" />
+            </svg>
+          </span>
+          <span class="font-display font-bold text-lg tracking-tight text-ink"
+            >Mama <span class="text-emerald">Jaben?</span>
+            <span class="text-muted font-medium text-sm">· Driver</span></span
+          >
+        </a>
+        <div class="flex items-center gap-4">
+          <span class="hidden sm:block text-sm text-muted">Hi, <span class="font-semibold text-ink">{{ driver.name }}</span></span>
+          <a href="{% url 'logout' %}" class="text-sm font-semibold text-muted hover:text-ink px-3 py-2 transition-colors">Log Out</a>
+        </div>
+      </div>
+    </header>
+
+    <!-- ============ MESSAGES ============ -->
+    {% if messages %}
+    <div class="max-w-3xl mx-auto px-5 sm:px-8 pt-4">
+      {% for message in messages %}
+      <div
+        class="mb-3 px-4 py-3 rounded-lg text-sm font-medium border {% if message.tags == 'success' %}bg-emerald-light text-emerald-dark border-emerald-ring{% elif message.tags == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-clay-light text-clay-dark border-clay-ring{% endif %}"
+      >
+        {{ message }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <main class="max-w-3xl mx-auto px-5 sm:px-8 py-10 sm:py-14">
+      {% if stage == 'driver_pending' %}
+      <div class="bg-card rounded-xl border border-hairline shadow-softer p-8 sm:p-10 text-center">
+        <div class="w-14 h-14 mx-auto rounded-full bg-clay-light grid place-items-center">
+          <svg class="w-6 h-6 text-clay-dark" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8" />
+            <path d="M12 7v5l3.5 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>
+        <h1 class="font-display font-bold text-2xl text-ink mt-5">Your application is under review</h1>
+        <p class="text-muted mt-2 max-w-sm mx-auto">
+          An admin needs to approve your driver account before you can register a vehicle. We'll notify you once that's done.
+        </p>
+      </div>
+
+      {% elif stage == 'driver_rejected' %}
+      <div class="bg-card rounded-xl border border-hairline shadow-softer p-8 sm:p-10 text-center">
+        <div class="w-14 h-14 mx-auto rounded-full bg-red-50 grid place-items-center">
+          <svg class="w-6 h-6 text-red-600" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8" />
+            <path d="m9 9 6 6M15 9l-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+        </div>
+        <h1 class="font-display font-bold text-2xl text-ink mt-5">Your application wasn't approved</h1>
+        <p class="text-muted mt-2 max-w-sm mx-auto">Please get in touch with support for details.</p>
+      </div>
+
+      {% elif stage == 'vehicle_needed' %}
+      <div class="bg-card rounded-xl border border-hairline shadow-softer p-8 sm:p-10 text-center">
+        <div class="w-14 h-14 mx-auto rounded-full bg-emerald-light grid place-items-center">
+          <svg class="w-6 h-6 text-emerald-dark" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M5 16h14M5 16l1.5-5.5A2 2 0 0 1 8.4 9h7.2a2 2 0 0 1 1.9 1.5L19 16M5 16v3a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-3"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </div>
+        <h1 class="font-display font-bold text-2xl text-ink mt-5">You're approved!</h1>
+        <p class="text-muted mt-2 max-w-sm mx-auto">Register your vehicle to start accepting ride requests.</p>
+        <a
+          href="{% url 'register_vehicle' %}"
+          class="inline-flex items-center gap-2 mt-6 bg-ink hover:bg-emerald-deep text-white font-semibold text-sm px-6 py-3.5 rounded-lg shadow-soft transition-colors"
+        >
+          Register Your Vehicle
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none">
+            <path d="M5 12h14M13 5l7 7-7 7" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </a>
+      </div>
+
+      {% elif stage == 'vehicle_pending' %}
+      <div class="bg-card rounded-xl border border-hairline shadow-softer p-8 sm:p-10 text-center">
+        <div class="w-14 h-14 mx-auto rounded-full bg-clay-light grid place-items-center">
+          <svg class="w-6 h-6 text-clay-dark" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8" />
+            <path d="M12 7v5l3.5 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>
+        <h1 class="font-display font-bold text-2xl text-ink mt-5">Vehicle under verification</h1>
+        <p class="text-muted mt-2 max-w-sm mx-auto">An admin is checking your vehicle details. This won't take long.</p>
+        <div class="mt-6 inline-flex items-center gap-6 bg-panel rounded-lg px-6 py-4 text-left">
+          <div>
+            <p class="text-[11px] font-semibold text-muted uppercase tracking-wide">Vehicle</p>
+            <p class="text-sm font-semibold text-ink mt-0.5">{{ vehicle.type }}{% if vehicle.max_capacity %} · {{ vehicle.max_capacity }}-seat{% endif %}</p>
+          </div>
+          <div>
+            <p class="text-[11px] font-semibold text-muted uppercase tracking-wide">License</p>
+            <p class="text-sm font-semibold text-ink mt-0.5">{{ vehicle.vehicle_license }}</p>
+          </div>
+        </div>
+      </div>
+
+      {% elif stage == 'vehicle_rejected' %}
+      <div class="bg-card rounded-xl border border-hairline shadow-softer p-8 sm:p-10 text-center">
+        <div class="w-14 h-14 mx-auto rounded-full bg-red-50 grid place-items-center">
+          <svg class="w-6 h-6 text-red-600" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8" />
+            <path d="m9 9 6 6M15 9l-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          </svg>
+        </div>
+        <h1 class="font-display font-bold text-2xl text-ink mt-5">Vehicle verification failed</h1>
+        <p class="text-muted mt-2 max-w-sm mx-auto">{{ vehicle.vehicle_license }} couldn't be verified. You can register another vehicle.</p>
+        <a
+          href="{% url 'register_vehicle' %}"
+          class="inline-flex items-center gap-2 mt-6 bg-ink hover:bg-emerald-deep text-white font-semibold text-sm px-6 py-3.5 rounded-lg shadow-soft transition-colors"
+        >
+          Register a Different Vehicle
+        </a>
+      </div>
+
+      {% else %}
+      <div class="bg-card rounded-xl border border-hairline shadow-softer p-8 sm:p-10 text-center">
+        <div class="w-14 h-14 mx-auto rounded-full bg-emerald-light grid place-items-center">
+          <svg class="w-6 h-6 text-emerald-dark" viewBox="0 0 24 24" fill="none">
+            <path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>
+        <h1 class="font-display font-bold text-2xl text-ink mt-5">You're all set, {{ driver.name }}!</h1>
+        <p class="text-muted mt-2 max-w-sm mx-auto">Your vehicle is verified. You're ready to accept ride requests.</p>
+        <div class="mt-6 inline-flex items-center gap-6 bg-panel rounded-lg px-6 py-4 text-left">
+          <div>
+            <p class="text-[11px] font-semibold text-muted uppercase tracking-wide">Vehicle</p>
+            <p class="text-sm font-semibold text-ink mt-0.5">{{ vehicle.type }}{% if vehicle.max_capacity %} · {{ vehicle.max_capacity }}-seat{% endif %}</p>
+          </div>
+          <div>
+            <p class="text-[11px] font-semibold text-muted uppercase tracking-wide">License</p>
+            <p class="text-sm font-semibold text-ink mt-0.5">{{ vehicle.vehicle_license }}</p>
+          </div>
+        </div>
+        <div>
+          <a
+            href="{% url 'driver_rides' %}"
+            class="inline-flex items-center gap-2 mt-6 bg-ink hover:bg-emerald-deep text-white font-semibold text-sm px-6 py-3.5 rounded-lg shadow-soft transition-colors"
+          >
+            View Nearby Ride Requests
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none">
+              <path d="M5 12h14M13 5l7 7-7 7" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </a>
+        </div>
+      </div>
+      {% endif %}
+    </main>
+  </body>
+</html>
