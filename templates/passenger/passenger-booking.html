@@ -190,15 +190,66 @@
           {% csrf_token %}
           <input type="hidden" id="field-start-location" name="start_location" />
           <input type="hidden" id="field-end-location" name="end_location" />
+          <input type="hidden" id="field-start-lat" name="start_lat" />
+          <input type="hidden" id="field-start-lng" name="start_lng" />
+          <input type="hidden" id="field-end-lat" name="end_lat" />
+          <input type="hidden" id="field-end-lng" name="end_lng" />
           <input type="hidden" id="field-vehicle-option" name="vehicle_option" />
           <input type="hidden" id="field-estimated-fare" name="estimated_fare" />
           <input type="hidden" id="field-coupon-code" name="coupon_code" />
-          <button type="submit"
+          <button type="button" id="confirm-booking-btn"
             class="w-full bg-ink hover:bg-emerald-deep text-white font-semibold text-sm px-6 py-3.5 rounded-lg shadow-soft transition-colors">
             Confirm Booking
           </button>
         </form>
       </div>
+<!-- Modal 1: ask if they want to share -->
+<div id="ask-share-modal"
+     class="fixed inset-0 bg-ink/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-soft max-w-sm w-full p-6">
+    <h3 class="font-display font-bold text-lg text-ink">Share a ride?</h3>
+    <p class="text-sm text-muted mt-2">
+      Want to see if there's a nearby ride you can join to save on fare?
+    </p>
+    <div class="mt-5 grid grid-cols-2 gap-2.5">
+      <button type="button" id="share-no-btn"
+        class="border border-hairline rounded-lg py-2.5 text-sm font-semibold text-ink hover:bg-canvas transition-colors">
+        No, book my own
+      </button>
+      <button type="button" id="share-yes-btn"
+        class="bg-ink hover:bg-emerald-deep text-white rounded-lg py-2.5 text-sm font-semibold transition-colors">
+        Yes, show me
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 2: list of joinable rides -->
+<div id="joinable-rides-modal"
+     class="fixed inset-0 bg-ink/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+  <div class="bg-white rounded-xl shadow-soft max-w-md w-full p-6 max-h-[80vh] overflow-y-auto">
+    <h3 class="font-display font-bold text-lg text-ink">Rides you can join</h3>
+    <p class="text-sm text-muted mt-1">
+      These rides pass near your pickup and can add you without major detour.
+    </p>
+    <div id="joinable-rides-list" class="mt-4 space-y-3">
+      <!-- populated by JS -->
+    </div>
+    <button type="button" id="joinable-none-btn"
+      class="mt-5 w-full border border-hairline rounded-lg py-2.5 text-sm font-semibold text-ink hover:bg-canvas transition-colors">
+      None of these — book my own ride
+    </button>
+  </div>
+</div>
+
+<!-- Loading overlay shown while checking rides -->
+<div id="checking-rides-overlay"
+     class="fixed inset-0 bg-ink/50 backdrop-blur-sm z-50 hidden items-center justify-center">
+  <div class="bg-white rounded-xl p-6 flex flex-col items-center gap-3">
+    <div class="w-10 h-10 rounded-full spinner"></div>
+    <p class="text-sm font-semibold text-ink">Checking nearby rides…</p>
+  </div>
+</div>
     </div>
   </main>
 
@@ -457,16 +508,195 @@
     }
 
     function updateTotal() {
-      if (!selectedVehicle) return;
-      const base = vehicleFares[selectedVehicle];
-      const total = appliedDiscount ? base * (1 - appliedDiscount / 100) : base;
+    if (!selectedVehicle) return;
 
-      document.getElementById("final-fare").textContent = "৳" + Math.round(total);
-      document.getElementById("field-vehicle-option").value = selectedVehicle;
-      document.getElementById("field-estimated-fare").value = Math.round(total);
-      document.getElementById("field-start-location").value = document.getElementById("pickup-input").value;
-      document.getElementById("field-end-location").value = document.getElementById("dest-input").value;
+    const base = vehicleFares[selectedVehicle];
+    const total = appliedDiscount ? base * (1 - appliedDiscount / 100) : base;
+
+    document.getElementById("final-fare").textContent = "৳" + Math.round(total);
+
+    document.getElementById("field-vehicle-option").value = selectedVehicle;
+    document.getElementById("field-estimated-fare").value = Math.round(total);
+
+    document.getElementById("field-start-location").value =
+        document.getElementById("pickup-input").value;
+
+    document.getElementById("field-end-location").value =
+        document.getElementById("dest-input").value;
+
+    // IMPORTANT: preserve the actual coordinates selected by the user
+    document.getElementById("field-start-lat").value = pickupLatLng.lat;
+    document.getElementById("field-start-lng").value = pickupLatLng.lng;
+    document.getElementById("field-end-lat").value = destLatLng.lat;
+    document.getElementById("field-end-lng").value = destLatLng.lng;
+}
+function getCsrfToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]').value;
+}
+
+function showModal(id) {
+    document.getElementById(id).classList.remove('hidden');
+    document.getElementById(id).classList.add('flex');
+}
+function hideModal(id) {
+    document.getElementById(id).classList.add('hidden');
+    document.getElementById(id).classList.remove('flex');
+}
+
+document.getElementById('confirm-booking-btn').addEventListener('click', function () {
+    if (!selectedVehicle) {
+        alert('Please select a vehicle option first.');
+        return;
     }
+    if (!pickupLatLng || !destLatLng) {
+        alert('Please pick a route first.');
+        return;
+    }
+    if (selectedVehicle === 'bike') {
+        submitConfirmBooking();
+        return;
+    }
+    showModal('ask-share-modal');
+});
+
+document.getElementById('share-no-btn').addEventListener('click', function () {
+    hideModal('ask-share-modal');
+    submitConfirmBooking();
+});
+
+document.getElementById('share-yes-btn').addEventListener('click', function () {
+    hideModal('ask-share-modal');
+    checkJoinableRides();
+});
+
+document.getElementById('joinable-none-btn').addEventListener('click', function () {
+    hideModal('joinable-rides-modal');
+    submitConfirmBooking();
+});
+
+function submitConfirmBooking() {
+    if (!pickupLatLng || !destLatLng || !selectedVehicle) {
+        alert("Please complete the route and select a vehicle.");
+        return;
+    }
+
+    // Location text
+    document.getElementById("field-start-location").value =
+        document.getElementById("pickup-input").value;
+
+    document.getElementById("field-end-location").value =
+        document.getElementById("dest-input").value;
+
+    // Coordinates
+    document.getElementById("field-start-lat").value = pickupLatLng.lat;
+    document.getElementById("field-start-lng").value = pickupLatLng.lng;
+    document.getElementById("field-end-lat").value = destLatLng.lat;
+    document.getElementById("field-end-lng").value = destLatLng.lng;
+
+    // Vehicle
+    document.getElementById("field-vehicle-option").value = selectedVehicle;
+
+    // Fare
+    const base = vehicleFares[selectedVehicle];
+    const total = appliedDiscount
+        ? base * (1 - appliedDiscount / 100)
+        : base;
+
+    document.getElementById("field-estimated-fare").value = Math.round(total);
+
+    console.log("SUBMITTING:");
+    console.log("start:", document.getElementById("field-start-location").value);
+    console.log("end:", document.getElementById("field-end-location").value);
+    console.log("vehicle:", document.getElementById("field-vehicle-option").value);
+    console.log("fare:", document.getElementById("field-estimated-fare").value);
+    console.log("coordinates:", pickupLatLng, destLatLng);
+
+    document.getElementById("confirm-booking-btn").disabled = true;
+    document.querySelector("#confirm-section form").submit();
+}
+
+function checkJoinableRides() {
+    showModal('checking-rides-overlay');
+
+    fetch('/check-joinable-rides/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken()
+        },
+        body: JSON.stringify({
+            start_lat: pickupLatLng.lat,
+            start_lng: pickupLatLng.lng,
+            end_lat: destLatLng.lat,
+            end_lng: destLatLng.lng,
+        }),
+    })
+    .then(res => res.json())
+    .then(data => {
+        hideModal('checking-rides-overlay');
+        const list = document.getElementById('joinable-rides-list');
+        list.innerHTML = '';
+
+        if (!data.rides || data.rides.length === 0) {
+            list.innerHTML = `
+                <div class="text-center py-4">
+                    <p class="text-sm text-muted">No shareable rides found nearby right now.</p>
+                    <p class="text-xs text-muted mt-1">You can still book your own ride below.</p>
+                </div>`;
+        } else {
+            data.rides.forEach(ride => {
+                list.innerHTML += `
+                    <div class="border border-hairline rounded-xl p-4">
+                        <div class="flex items-center justify-between">
+                            <p class="text-sm font-semibold text-ink">Ride #${ride.ride_id}</p>
+                            <span class="text-xs font-semibold text-emerald-dark bg-emerald-light px-2 py-0.5 rounded-full">
+                                +${ride.detour_km} km detour
+                            </span>
+                        </div>
+                        <p class="text-xs text-muted mt-1">
+                            Inserted at stop position ${ride.insertion_index + 1}
+                        </p>
+                        <button type="button"
+                            onclick="requestJoin(${ride.ride_id})"
+                            class="mt-3 w-full bg-ink hover:bg-emerald-deep text-white text-sm font-semibold py-2.5 rounded-lg transition-colors">
+                            Request to Join
+                        </button>
+                    </div>`;
+            });
+        }
+        showModal('joinable-rides-modal');
+    })
+    .catch(() => {
+        hideModal('checking-rides-overlay');
+        alert('Could not check for shareable rides. Try again.');
+    });
+}
+
+function requestJoin(rideId) {
+    fetch(`/request-join-ride/${rideId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCsrfToken()
+        },
+        body: JSON.stringify({
+            dest_lat: destLatLng.lat,
+            dest_lng: destLatLng.lng,
+            end_location: document.getElementById('dest-input').value,
+        }),
+    })
+    .then(res => res.json())
+    .then(data => {
+        hideModal('joinable-rides-modal');
+        if (data.success) {
+            alert(`Join request sent! Your estimated fare: ৳${data.your_estimated_fare}`);
+            window.location.href = "{% url 'passenger_dashboard' %}";
+        } else {
+            alert(data.error);
+        }
+    })
+    .catch(() => alert('Something went wrong. Please try again.'));
+}
   </script>
 </body>
 

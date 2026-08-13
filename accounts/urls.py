@@ -23,4 +23,6 @@ urlpatterns = [
     path('geocode-reverse/', views.geocode_reverse, name='geocode_reverse'),
     path('driver/nearby-rides/', views.nearby_rides, name='nearby_rides'),
     path('driver/accept-ride/<int:request_id>/', views.accept_ride, name='accept_ride'),
+    path('check-joinable-rides/', views.check_joinable_rides, name='check_joinable_rides'),
+    path('request-join-ride/<int:ride_id>/', views.request_join_ride, name='request_join_ride'),
 ]

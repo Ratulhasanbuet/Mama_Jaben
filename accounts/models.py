@@ -79,12 +79,13 @@ class Ride(models.Model):
     end_location = models.CharField(max_length=255)
     date = models.DateField()
     time = models.TimeField()
-
+    # slight modification
+    status = models.CharField(max_length=20, default='Pending')
     # "Serves" Relationship -> Driver
-    driver = models.ForeignKey(Driver, on_delete=models.CASCADE, related_name='rides')
+    driver = models.ForeignKey(Driver, on_delete=models.CASCADE, related_name='rides',null=True, blank=True)
 
     # "Used" Relationship -> Vehicle
-    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='rides')
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='rides',null=True, blank=True)
 
     def __str__(self):
         return f"Ride #{self.ride_id}: {self.start_location} to {self.end_location}"
@@ -109,7 +110,8 @@ class RideRequest(models.Model):
     estimated_fare = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     requested_vehicle_type = models.CharField(max_length=30, default='')  # Bike, Car
     requested_capacity = models.IntegerField(null=True, blank=True)  # 4 or 8, only when type is Car
-
+    # dropoff keeps track of route sequence
+    dropoff = models.IntegerField(null=True, blank=True)
     # Connected with Passenger & Ride
     passenger = models.ForeignKey(Passenger, on_delete=models.CASCADE, related_name='ride_requests')
     ride = models.ForeignKey(Ride, on_delete=models.CASCADE, related_name='requests', null=True, blank=True)
