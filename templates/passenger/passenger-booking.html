@@ -180,6 +180,27 @@
         {% endif %}
       </div>
 
+      <!-- ============ PAYMENT METHOD ============ -->
+      <div id="payment-method-section" class="hidden mt-6 pt-6 border-t border-hairline">
+        <label class="text-sm font-semibold text-ink">Payment Method</label>
+        <div class="grid grid-cols-2 gap-3 mt-2">
+          <label class="flex items-center gap-3 border border-hairline rounded-lg p-3.5 cursor-pointer hover:border-emerald-ring transition-colors">
+            <input type="radio" name="payment_method_option" value="cash" checked class="accent-emerald text-emerald focus:ring-emerald-ring">
+            <div>
+              <p class="text-sm font-semibold text-ink">Cash</p>
+              <p class="text-xs text-muted">Pay driver in cash</p>
+            </div>
+          </label>
+          <label class="flex items-center gap-3 border border-hairline rounded-lg p-3.5 cursor-pointer hover:border-emerald-ring transition-colors">
+            <input type="radio" name="payment_method_option" value="online" class="accent-emerald text-emerald focus:ring-emerald-ring">
+            <div>
+              <p class="text-sm font-semibold text-ink">Online Payment</p>
+              <p class="text-xs text-muted">SSLCommerz (bKash/Cards)</p>
+            </div>
+          </label>
+        </div>
+      </div>
+
       <!-- ============ CONFIRM ============ -->
       <div id="confirm-section" class="hidden mt-6 pt-6 border-t border-hairline">
         <div class="flex items-center justify-between mb-4">
@@ -197,12 +218,14 @@
           <input type="hidden" id="field-vehicle-option" name="vehicle_option" />
           <input type="hidden" id="field-estimated-fare" name="estimated_fare" />
           <input type="hidden" id="field-coupon-code" name="coupon_code" />
+          <input type="hidden" id="field-payment-method" name="payment_method" value="cash" />
           <button type="button" id="confirm-booking-btn"
             class="w-full bg-ink hover:bg-emerald-deep text-white font-semibold text-sm px-6 py-3.5 rounded-lg shadow-soft transition-colors">
             Confirm Booking
           </button>
         </form>
       </div>
+
 <!-- Modal 1: ask if they want to share -->
 <div id="ask-share-modal"
      class="fixed inset-0 bg-ink/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
@@ -495,9 +518,16 @@
         card.classList.toggle("is-selected", card.dataset.vehicle === key);
       });
       document.getElementById("coupon-section").classList.remove("hidden");
+      document.getElementById("payment-method-section").classList.remove("hidden");
       document.getElementById("confirm-section").classList.remove("hidden");
       updateTotal();
     }
+
+    document.querySelectorAll('input[name="payment_method_option"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        document.getElementById('field-payment-method').value = e.target.value;
+      });
+    });
 
     function applyCoupon() {
       const select = document.getElementById("coupon-select");

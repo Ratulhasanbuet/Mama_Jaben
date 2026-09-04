@@ -1,15 +1,19 @@
 import json
+import time
 from itertools import permutations
 
 import requests
-
 import math
+
 from django.shortcuts import render, redirect
 from django.db import connection
 from django.contrib.auth.hashers import make_password, check_password
 from django.contrib import messages
 from django.core.files.storage import FileSystemStorage
 from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+
+from .sslcommerz import initiate_sslcommerz_payment, validate_sslcommerz_payment
 
 
 def home(request):
@@ -127,9 +131,6 @@ def driver_register(request):
     return render(request, "mama-jaben-landing.html")
 
 
-# ==========================================
-# PASSENGER DASHBOARD
-# ==========================================
 def passenger_dashboard(request):
     if request.session.get('role') != 'passenger':
         messages.error(request, 'Please log in as a passenger first')
@@ -156,10 +157,15 @@ def passenger_dashboard(request):
                               rr.time,
                               rr.requested_vehicle_type,
                               rr.requested_capacity,
-                              d.name
+                              d.name,
+                              rr.payment_method,
+                              pay.status AS payment_status
                        FROM accounts_riderequest rr
                                 LEFT JOIN accounts_ride r ON rr.ride_id = r.ride_id
                                 LEFT JOIN accounts_driver d ON r.driver_id = d.driver_id
+                                LEFT JOIN accounts_payment pay
+                                          ON pay.passenger_id = rr.passenger_id AND pay.ride_id = rr.ride_id AND
+                                             pay.payment_type = 'ride_fare' AND pay.status = 'Paid'
                        WHERE rr.passenger_id = %s
                        ORDER BY rr.date DESC, rr.time DESC
                        """, [user_id])
@@ -191,6 +197,8 @@ def passenger_dashboard(request):
             'vehicle_type': row[7],
             'capacity': row[8],
             'driver_name': row[9],
+            'payment_method': row[10],
+            'is_paid': (row[11] == 'Paid'),
         }
         for row in ride_rows
     ]
@@ -207,10 +215,6 @@ def passenger_dashboard(request):
     }
     return render(request, 'passenger/passenger-dashboard.html', context)
 
-
-# ==========================================
-# RIDE BOOKING
-# ==========================================
 
 # key used in the frontend <-> what gets stored on RideRequest
 VEHICLE_OPTIONS = {
@@ -386,6 +390,10 @@ def confirm_booking(request):
     estimated_fare = request.POST.get('estimated_fare')
     coupon_code = request.POST.get('coupon_code') or None  # treat empty string as None
 
+    payment_method = request.POST.get('payment_method', 'cash')
+    if payment_method not in ['cash', 'online']:
+        payment_method = 'cash'
+
     # Resolve coordinates server-side via OpenStreetMap Nominatim
     start_lat = request.POST.get('start_lat')
     start_lng = request.POST.get('start_lng')
@@ -427,15 +435,115 @@ def confirm_booking(request):
         cursor.execute("""
                        INSERT INTO accounts_riderequest
                        (status, date, time, start_location, start_lat, start_lng, end_location, end_lat, end_lng,
-                        estimated_fare, requested_vehicle_type, requested_capacity, passenger_id, ride_id, coupon_id)
-                       VALUES (%s, CURRENT_DATE, CURRENT_TIME, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        estimated_fare, requested_vehicle_type, requested_capacity, payment_method, passenger_id,
+                        ride_id, coupon_id)
+                       VALUES (%s, CURRENT_DATE, CURRENT_TIME, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                               %s) RETURNING ride_request_id
                        """, [
                            'Pending', start_location, start_lat, start_lng, end_location, end_lat, end_lng,
-                           estimated_fare, option['type'], option['capacity'], user_id,new_ride_id, coupon_code
+                           estimated_fare, option['type'], option['capacity'], payment_method, user_id, new_ride_id,
+                           coupon_code
                        ])
+        new_request_id = cursor.fetchone()[0]
 
-    messages.success(request, "Ride requested! We'll notify you once a driver accepts.")
+        cursor.execute("SELECT name, email, phone FROM accounts_passenger WHERE user_id = %s", [user_id])
+        pass_row = cursor.fetchone()
+
+    name = pass_row[0] if pass_row else 'Passenger'
+    email = pass_row[1] if pass_row else 'passenger@example.com'
+    phone = pass_row[2] if pass_row else '01700000000'
+
+    if payment_method == 'online':
+        try:
+            fare_val = float(estimated_fare)
+        except (TypeError, ValueError):
+            fare_val = 0.0
+
+        if fare_val > 0:
+            tran_id = f"PASS-RIDE-{new_request_id}-{int(time.time())}"
+            domain = request.build_absolute_uri('/')[:-1]
+            success_url = f"{domain}/payment/ssl-success/"
+            fail_url = f"{domain}/payment/ssl-fail/"
+            cancel_url = f"{domain}/payment/ssl-cancel/"
+
+            customer_data = {'name': name, 'email': email, 'phone': phone}
+            success, result = initiate_sslcommerz_payment(
+                tran_id=tran_id,
+                amount=fare_val,
+                success_url=success_url,
+                fail_url=fail_url,
+                cancel_url=cancel_url,
+                cus_data=customer_data,
+                product_name="Ride Fare Payment"
+            )
+            if success:
+                messages.info(request, "Redirecting to SSLCommerz Payment Gateway...")
+                return redirect(result)
+            else:
+                messages.error(request, f"SSLCommerz Session Error: {result}. Ride requested, please pay later.")
+
+    messages.success(request,
+                     f"Ride requested via {payment_method.capitalize()}! We'll notify you once a driver accepts.")
     return redirect('passenger_dashboard')
+
+
+@csrf_exempt
+def initiate_passenger_payment(request, request_id):
+    """Passenger initiates online payment for an active or pending ride via SSLCommerz."""
+    if request.session.get('role') != 'passenger':
+        messages.error(request, 'Please log in as a passenger first')
+        return redirect('home')
+
+    user_id = request.session.get('user_id')
+
+    with connection.cursor() as cursor:
+        cursor.execute("""
+                       SELECT rr.estimated_fare, rr.status, p.name, p.email, p.phone
+                       FROM accounts_riderequest rr
+                                JOIN accounts_passenger p ON rr.passenger_id = p.user_id
+                       WHERE rr.ride_request_id = %s
+                         AND rr.passenger_id = %s
+                       """, [request_id, user_id])
+        row = cursor.fetchone()
+
+    if not row:
+        messages.error(request, 'Ride request not found')
+        return redirect('passenger_dashboard')
+
+    estimated_fare, status, name, email, phone = row
+
+    if status == 'Cancelled':
+        messages.error(request, 'Cannot pay for a cancelled ride.')
+        return redirect('passenger_dashboard')
+
+    try:
+        amount = float(estimated_fare)
+    except (TypeError, ValueError):
+        messages.error(request, 'Invalid fare amount.')
+        return redirect('passenger_dashboard')
+
+    tran_id = f"PASS-RIDE-{request_id}-{int(time.time())}"
+    domain = request.build_absolute_uri('/')[:-1]
+    success_url = f"{domain}/payment/ssl-success/"
+    fail_url = f"{domain}/payment/ssl-fail/"
+    cancel_url = f"{domain}/payment/ssl-cancel/"
+
+    customer_data = {'name': name, 'email': email, 'phone': phone}
+    success, result = initiate_sslcommerz_payment(
+        tran_id=tran_id,
+        amount=amount,
+        success_url=success_url,
+        fail_url=fail_url,
+        cancel_url=cancel_url,
+        cus_data=customer_data,
+        product_name="Ride Fare Payment"
+    )
+
+    if success:
+        return redirect(result)
+    else:
+        messages.error(request, f'SSLCommerz payment initialization failed: {result}')
+        return redirect('passenger_dashboard')
 
 
 # ==========================================
@@ -610,6 +718,18 @@ def nearby_rides(request):
     driver_id = request.session.get('user_id')
 
     with connection.cursor() as cursor:
+        cursor.execute("SELECT wallet_balance FROM accounts_driver WHERE driver_id = %s", [driver_id])
+        w_row = cursor.fetchone()
+        wallet_balance = float(w_row[0]) if w_row and w_row[0] is not None else 0.0
+
+        if wallet_balance < -500.00:
+            return JsonResponse({
+                'rides': [],
+                'is_blocked': True,
+                'wallet_balance': round(wallet_balance, 2),
+                'error': f'Your wallet balance (৳{wallet_balance:.2f}) is below the -৳500.00 BDT limit. Please settle your dues via SSLCommerz to resume accepting rides.'
+            })
+
         cursor.execute(
             "SELECT type, max_capacity FROM accounts_vehicle "
             "WHERE driver_id = %s AND status = 'approved' ORDER BY vehicle_id DESC LIMIT 1",
@@ -621,6 +741,29 @@ def nearby_rides(request):
             return JsonResponse({'error': 'No verified vehicle on file'}, status=403)
 
         vehicle_type, vehicle_capacity = vehicle_row
+
+        # Check if driver currently has an active accepted ride
+        cursor.execute(
+            "SELECT r.ride_id, r.start_location, r.end_location "
+            "FROM accounts_ride r "
+            "WHERE r.driver_id = %s AND r.status = 'Accepted' ORDER BY r.ride_id DESC LIMIT 1",
+            [driver_id]
+        )
+        active_ride_row = cursor.fetchone()
+        active_ride_info = None
+        if active_ride_row:
+            a_id, a_start, a_end = active_ride_row
+            cursor.execute(
+                "SELECT COALESCE(SUM(estimated_fare), 0) FROM accounts_riderequest WHERE ride_id = %s",
+                [a_id]
+            )
+            a_fare = cursor.fetchone()[0]
+            active_ride_info = {
+                'ride_id': a_id,
+                'start_location': a_start,
+                'end_location': a_end,
+                'total_fare': float(a_fare) if a_fare else 0.0,
+            }
 
         cursor.execute("""
                        SELECT ride_request_id,
@@ -663,7 +806,67 @@ def nearby_rides(request):
         })
 
     nearby.sort(key=lambda r: r['distance_km'])
-    return JsonResponse({'rides': nearby})
+    return JsonResponse({
+        'rides': nearby,
+        'has_active_ride': active_ride_info is not None,
+        'active_ride': active_ride_info
+    })
+
+
+def driver_active_ride(request):
+    """AJAX endpoint: returns current active ride details for the logged-in driver."""
+    if request.session.get('role') != 'driver':
+        return JsonResponse({'error': 'Please log in as a driver first'}, status=403)
+
+    driver_id = request.session.get('user_id')
+
+    with connection.cursor() as cursor:
+        cursor.execute("""
+                       SELECT r.ride_id, r.status, r.start_location, r.end_location, r.date, r.time
+                       FROM accounts_ride r
+                       WHERE r.driver_id = %s
+                         AND r.status = 'Accepted'
+                       ORDER BY r.ride_id DESC LIMIT 1
+                       """, [driver_id])
+        ride_row = cursor.fetchone()
+
+        if not ride_row:
+            return JsonResponse({'active': False, 'ride': None})
+
+        ride_id, status, start_loc, end_loc, date, time = ride_row
+
+        cursor.execute("""
+                       SELECT rr.ride_request_id, rr.start_location, rr.end_location, rr.estimated_fare, p.name, p.phone
+                       FROM accounts_riderequest rr
+                                JOIN accounts_passenger p ON rr.passenger_id = p.user_id
+                       WHERE rr.ride_id = %s
+                       """, [ride_id])
+        req_rows = cursor.fetchall()
+
+    total_fare = sum(float(row[3]) for row in req_rows if row[3] is not None)
+    passengers = [
+        {
+            'name': row[4],
+            'phone': row[5],
+            'pickup': row[1],
+            'dropoff': row[2],
+            'fare': float(row[3]) if row[3] else 0.0
+        }
+        for row in req_rows
+    ]
+
+    return JsonResponse({
+        'active': True,
+        'ride': {
+            'ride_id': ride_id,
+            'status': status,
+            'start_location': start_loc,
+            'end_location': end_loc,
+            'total_fare': round(total_fare, 2),
+            'passengers': passengers,
+            'passenger_count': len(passengers),
+        }
+    })
 
 
 def accept_ride(request, request_id):
@@ -676,6 +879,24 @@ def accept_ride(request, request_id):
     driver_id = request.session.get('user_id')
 
     with connection.cursor() as cursor:
+        cursor.execute("SELECT wallet_balance FROM accounts_driver WHERE driver_id = %s", [driver_id])
+        w_row = cursor.fetchone()
+        wallet_balance = float(w_row[0]) if w_row and w_row[0] is not None else 0.0
+        if wallet_balance < -500.00:
+            return JsonResponse({
+                'error': f'Your wallet balance (৳{wallet_balance:.2f}) is below the -৳500.00 BDT limit. Please settle your dues via SSLCommerz before accepting new rides.'
+            }, status=403)
+
+        # Guard: Check if driver already has an active accepted ride
+        cursor.execute(
+            "SELECT ride_id FROM accounts_ride WHERE driver_id = %s AND status = 'Accepted' LIMIT 1",
+            [driver_id]
+        )
+        if cursor.fetchone():
+            return JsonResponse({
+                'error': 'You already have an active ride in progress. You cannot accept another ride until you finish or cancel your current ride!'
+            }, status=400)
+
         cursor.execute(
             "SELECT vehicle_id FROM accounts_vehicle "
             "WHERE driver_id = %s AND status = 'approved' ORDER BY vehicle_id DESC LIMIT 1",
@@ -693,6 +914,7 @@ def accept_ride(request, request_id):
         if not row:
             return JsonResponse({'error': 'Ride request not found'}, status=404)
         ride_id = row[0]
+
     with connection.cursor() as cursor:
         # Atomically claim the request first — the WHERE guard means only one
         # driver can ever flip a given request from Pending to Accepted.
@@ -710,6 +932,537 @@ def accept_ride(request, request_id):
         )
 
     return JsonResponse({'success': True, 'ride_id': ride_id})
+
+
+def complete_ride(request, ride_id):
+    """Endpoint for a driver to mark their active ride as completed, increasing driver earnings and applying platform commission."""
+    if request.session.get('role') != 'driver':
+        return JsonResponse({'error': 'Please log in as a driver first'}, status=403)
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    driver_id = request.session.get('user_id')
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT ride_id FROM accounts_ride WHERE ride_id = %s AND driver_id = %s AND status = 'Accepted'",
+            [ride_id, driver_id]
+        )
+        if not cursor.fetchone():
+            return JsonResponse({'error': 'Active ride not found or already completed'}, status=404)
+
+        # Query passenger requests for this ride
+        cursor.execute(
+            "SELECT passenger_id, estimated_fare, payment_method FROM accounts_riderequest WHERE ride_id = %s",
+            [ride_id]
+        )
+        req_rows = cursor.fetchall()
+
+        total_fare = sum(float(r[1]) for r in req_rows if r[1] is not None)
+        commission = total_fare * 0.15
+        net_driver_amount = total_fare * 0.85
+
+        payment_methods = [r[2] for r in req_rows if r[2]]
+        ride_payment_method = payment_methods[0] if payment_methods else 'cash'
+
+        # Mark ride as Completed
+        cursor.execute(
+            "UPDATE accounts_ride SET status = 'Completed' WHERE ride_id = %s",
+            [ride_id]
+        )
+
+        # Mark ride requests as Completed
+        cursor.execute(
+            "UPDATE accounts_riderequest SET status = 'Completed' WHERE ride_id = %s",
+            [ride_id]
+        )
+
+        # Credit driver cumulative gross earnings
+        cursor.execute(
+            "UPDATE accounts_driver SET earnings = COALESCE(earnings, 0) + %s WHERE driver_id = %s",
+            [total_fare, driver_id]
+        )
+
+        if ride_payment_method == 'cash':
+            # Driver took cash in hand from passenger.
+            # System deducts 15% platform commission from Driver's wallet.
+            cursor.execute(
+                "UPDATE accounts_driver SET wallet_balance = COALESCE(wallet_balance, 0) - %s WHERE driver_id = %s",
+                [commission, driver_id]
+            )
+
+            cursor.execute("""
+                           INSERT INTO accounts_driverwallettransaction (driver_id, ride_id, amount, transaction_type, description, created_at)
+                           VALUES (%s, %s, %s, 'cash_commission', %s, NOW())
+                           """, [driver_id, ride_id, -commission,
+                                 f'15% commission deducted for Cash Ride #{ride_id} (Fare: ৳{total_fare:.2f})'])
+
+            for p_id, p_fare, p_method in req_rows:
+                if p_fare is not None:
+                    p_comm = float(p_fare) * 0.15
+                    p_driver = float(p_fare) * 0.85
+                    cursor.execute("""
+                                   INSERT INTO accounts_payment (amount, status, payment_method, payment_type,
+                                                                 commission_amount, driver_amount, passenger_id,
+                                                                 ride_id)
+                                   VALUES (%s, 'Paid', 'cash', 'ride_fare', %s, %s, %s, %s)
+                                   """, [p_fare, p_comm, p_driver, p_id, ride_id])
+        else:
+            # Online payment: Passenger paid online via SSLCommerz. Platform holds money.
+            # Platform retains 15% commission and credits 85% net fare to Driver's wallet.
+            cursor.execute(
+                "UPDATE accounts_driver SET wallet_balance = COALESCE(wallet_balance, 0) + %s WHERE driver_id = %s",
+                [net_driver_amount, driver_id]
+            )
+
+            cursor.execute("""
+                           INSERT INTO accounts_driverwallettransaction (driver_id, ride_id, amount, transaction_type, description, created_at)
+                           VALUES (%s, %s, %s, 'online_ride_credit', %s, NOW())
+                           """, [driver_id, ride_id, net_driver_amount,
+                                 f'85% net fare credited for Online Ride #{ride_id} (Fare: ৳{total_fare:.2f})'])
+
+            for p_id, p_fare, p_method in req_rows:
+                if p_fare is not None:
+                    p_comm = float(p_fare) * 0.15
+                    p_driver = float(p_fare) * 0.85
+                    cursor.execute("""
+                                   INSERT INTO accounts_payment (amount, status, payment_method, payment_type,
+                                                                 commission_amount, driver_amount, passenger_id,
+                                                                 ride_id)
+                                   VALUES (%s, 'Paid', 'online', 'ride_fare', %s, %s, %s, %s)
+                                   """, [p_fare, p_comm, p_driver, p_id, ride_id])
+
+    return JsonResponse({
+        'success': True,
+        'earned_amount': round(total_fare, 2),
+        'commission': round(commission, 2),
+        'net_driver_amount': round(net_driver_amount, 2),
+        'payment_method': ride_payment_method,
+        'message': f'Ride completed! Total Fare: ৳{total_fare:.2f} ({ride_payment_method.capitalize()}).'
+    })
+
+
+def cancel_ride(request, ride_id):
+    """Endpoint for a driver to cancel an active accepted ride."""
+    if request.session.get('role') != 'driver':
+        return JsonResponse({'error': 'Please log in as a driver first'}, status=403)
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    driver_id = request.session.get('user_id')
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT ride_id FROM accounts_ride WHERE ride_id = %s AND driver_id = %s AND status = 'Accepted'",
+            [ride_id, driver_id]
+        )
+        if not cursor.fetchone():
+            return JsonResponse({'error': 'Active ride not found or cannot be cancelled'}, status=404)
+
+        # Revert ride to Pending, unassign driver & vehicle
+        cursor.execute(
+            "UPDATE accounts_ride SET status = 'Pending', driver_id = NULL, vehicle_id = NULL WHERE ride_id = %s",
+            [ride_id]
+        )
+
+        # Revert ride requests to Pending
+        cursor.execute(
+            "UPDATE accounts_riderequest SET status = 'Pending' WHERE ride_id = %s",
+            [ride_id]
+        )
+
+    return JsonResponse(
+        {'success': True, 'message': 'Ride cancelled successfully. It is now back in the pending requests queue.'})
+
+
+@csrf_exempt
+def cancel_passenger_ride(request, request_id):
+    """Endpoint for a passenger to cancel their pending or accepted ride request."""
+    if request.session.get('role') != 'passenger':
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest' or 'application/json' in request.headers.get(
+                'accept', ''):
+            return JsonResponse({'error': 'Please log in as a passenger first'}, status=403)
+        messages.error(request, 'Please log in as a passenger first')
+        return redirect('home')
+
+    if request.method != 'POST':
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest' or 'application/json' in request.headers.get(
+                'accept', ''):
+            return JsonResponse({'error': 'POST required'}, status=405)
+        return redirect('passenger_dashboard')
+
+    user_id = request.session.get('user_id')
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT ride_id, status FROM accounts_riderequest WHERE ride_request_id = %s AND passenger_id = %s",
+            [request_id, user_id]
+        )
+        row = cursor.fetchone()
+
+        if not row:
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest' or 'application/json' in request.headers.get(
+                    'accept', ''):
+                return JsonResponse({'error': 'Ride request not found'}, status=404)
+            messages.error(request, 'Ride request not found.')
+            return redirect('passenger_dashboard')
+
+        ride_id, current_status = row
+
+        if current_status not in ['Pending', 'Accepted']:
+            msg = f'Cannot cancel ride request with status "{current_status}".'
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest' or 'application/json' in request.headers.get(
+                    'accept', ''):
+                return JsonResponse({'error': msg}, status=400)
+            messages.error(request, msg)
+            return redirect('passenger_dashboard')
+
+        # Mark this ride request as Cancelled
+        cursor.execute(
+            "UPDATE accounts_riderequest SET status = 'Cancelled' WHERE ride_request_id = %s",
+            [request_id]
+        )
+
+        # Check if there are any remaining active requests for this ride
+        if ride_id:
+            cursor.execute(
+                "SELECT COUNT(*) FROM accounts_riderequest WHERE ride_id = %s AND status IN ('Pending', 'Accepted')",
+                [ride_id]
+            )
+            remaining_count = cursor.fetchone()[0]
+
+            if remaining_count == 0:
+                # If no active passengers left on this ride, cancel the parent ride as well
+                cursor.execute(
+                    "UPDATE accounts_ride SET status = 'Cancelled' WHERE ride_id = %s",
+                    [ride_id]
+                )
+
+    msg = 'Your ride request has been cancelled successfully.'
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest' or 'application/json' in request.headers.get(
+            'accept', ''):
+        return JsonResponse({'success': True, 'message': msg})
+
+    messages.success(request, msg)
+    return redirect('passenger_dashboard')
+
+
+def driver_earnings(request):
+    """View: Driver Earnings & Wallet Dashboard."""
+    if request.session.get('role') != 'driver':
+        messages.error(request, 'Please log in as a driver first')
+        return redirect('home')
+
+    driver_id = request.session.get('user_id')
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT name, email, phone, earnings, wallet_balance FROM accounts_driver WHERE driver_id = %s",
+            [driver_id]
+        )
+        driver_row = cursor.fetchone()
+
+        if not driver_row:
+            request.session.flush()
+            return redirect('home')
+
+        driver_name, driver_email, driver_phone, stored_earnings, stored_wallet = driver_row
+        stored_earnings = float(stored_earnings) if stored_earnings is not None else 0.0
+        wallet_balance = float(stored_wallet) if stored_wallet is not None else 0.0
+        is_blocked = wallet_balance < -500.00
+
+        # Query completed rides history
+        cursor.execute("""
+                       SELECT r.ride_id,
+                              r.start_location,
+                              r.end_location,
+                              r.date,
+                              r.time,
+                              COALESCE(SUM(rr.estimated_fare), 0) AS total_fare,
+                              COUNT(rr.ride_request_id)           AS passenger_count
+                       FROM accounts_ride r
+                                LEFT JOIN accounts_riderequest rr ON r.ride_id = rr.ride_id
+                       WHERE r.driver_id = %s
+                         AND r.status = 'Completed'
+                       GROUP BY r.ride_id, r.start_location, r.end_location, r.date, r.time
+                       ORDER BY r.date DESC, r.time DESC
+                       """, [driver_id])
+        completed_rows = cursor.fetchall()
+
+        # Query driver wallet transactions history
+        cursor.execute("""
+                       SELECT transaction_id, amount, transaction_type, description, created_at
+                       FROM accounts_driverwallettransaction
+                       WHERE driver_id = %s
+                       ORDER BY created_at DESC
+                       """, [driver_id])
+        wallet_tx_rows = cursor.fetchall()
+
+    completed_rides = [
+        {
+            'ride_id': row[0],
+            'start_location': row[1],
+            'end_location': row[2],
+            'date': row[3],
+            'time': row[4],
+            'fare': float(row[5]),
+            'passenger_count': row[6],
+        }
+        for row in completed_rows
+    ]
+
+    wallet_transactions = [
+        {
+            'transaction_id': row[0],
+            'amount': float(row[1]),
+            'abs_amount': abs(float(row[1])),
+            'transaction_type': row[2],
+            'description': row[3],
+            'created_at': row[4],
+        }
+        for row in wallet_tx_rows
+    ]
+
+    total_completed = len(completed_rides)
+    sum_fare = sum(r['fare'] for r in completed_rides)
+    total_earnings = max(stored_earnings, sum_fare)
+    avg_fare = (total_earnings / total_completed) if total_completed > 0 else 0.0
+
+    context = {
+        'driver': {
+            'name': driver_name,
+            'email': driver_email,
+            'phone': driver_phone,
+        },
+        'wallet_balance': round(wallet_balance, 2),
+        'is_blocked': is_blocked,
+        'wallet_transactions': wallet_transactions,
+        'total_earnings': round(total_earnings, 2),
+        'total_completed': total_completed,
+        'avg_fare': round(avg_fare, 2),
+        'completed_rides': completed_rides,
+    }
+    return render(request, 'driver/driver-earnings.html', context)
+
+
+@csrf_exempt
+def initiate_driver_settlement(request):
+    """Driver initiates wallet top-up / debt settlement via SSLCommerz Sandbox."""
+    if request.session.get('role') != 'driver':
+        return JsonResponse({'error': 'Please log in as a driver first'}, status=403)
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    driver_id = request.session.get('user_id')
+
+    amount_str = request.POST.get('amount')
+    if not amount_str and request.body:
+        try:
+            body_json = json.loads(request.body)
+            amount_str = body_json.get('amount')
+        except Exception:
+            pass
+
+    try:
+        amount = float(amount_str)
+        if amount <= 0:
+            raise ValueError()
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'Please enter a valid positive settlement amount.'}, status=400)
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT name, email, phone FROM accounts_driver WHERE driver_id = %s", [driver_id])
+        driver_row = cursor.fetchone()
+
+    if not driver_row:
+        return JsonResponse({'error': 'Driver not found'}, status=404)
+
+    name, email, phone = driver_row
+    tran_id = f"DRV-SETTLE-{driver_id}-{int(time.time())}"
+
+    domain = request.build_absolute_uri('/')[:-1]
+    success_url = f"{domain}/payment/ssl-success/"
+    fail_url = f"{domain}/payment/ssl-fail/"
+    cancel_url = f"{domain}/payment/ssl-cancel/"
+
+    customer_data = {'name': name, 'email': email, 'phone': phone}
+    success, result = initiate_sslcommerz_payment(
+        tran_id=tran_id,
+        amount=amount,
+        success_url=success_url,
+        fail_url=fail_url,
+        cancel_url=cancel_url,
+        cus_data=customer_data,
+        product_name="Driver Wallet Settlement"
+    )
+
+    if success:
+        return JsonResponse({'success': True, 'gateway_url': result})
+    else:
+        return JsonResponse({'error': f'Payment initialization failed: {result}'}, status=400)
+
+
+@csrf_exempt
+def request_driver_withdraw(request):
+    """Driver requests cash out / withdrawal of positive wallet balance to bKash / Nagad / Bank account."""
+    if request.session.get('role') != 'driver':
+        return JsonResponse({'error': 'Please log in as a driver first'}, status=403)
+
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    driver_id = request.session.get('user_id')
+
+    amount_str = request.POST.get('amount')
+    method = request.POST.get('payment_method', 'bKash')
+    account_no = request.POST.get('account_number', '').strip()
+
+    if not amount_str and request.body:
+        try:
+            body_json = json.loads(request.body)
+            amount_str = body_json.get('amount')
+            method = body_json.get('payment_method', method)
+            account_no = body_json.get('account_number', account_no)
+        except Exception:
+            pass
+
+    try:
+        amount = float(amount_str)
+        if amount <= 0:
+            raise ValueError()
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'Please enter a valid positive withdrawal amount.'}, status=400)
+
+    if not account_no:
+        return JsonResponse({'error': 'Please provide a valid account or mobile number for payout.'}, status=400)
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT wallet_balance FROM accounts_driver WHERE driver_id = %s", [driver_id])
+        w_row = cursor.fetchone()
+        current_balance = float(w_row[0]) if w_row and w_row[0] is not None else 0.0
+
+        if amount > current_balance:
+            return JsonResponse({
+                'error': f'Insufficient balance! Available wallet balance: ৳{current_balance:.2f} BDT.'
+            }, status=400)
+
+        # Deduct requested amount from driver wallet balance
+        cursor.execute(
+            "UPDATE accounts_driver SET wallet_balance = wallet_balance - %s WHERE driver_id = %s",
+            [amount, driver_id]
+        )
+
+        # Log driver wallet transaction for cash out
+        desc = f'Cash Out via {method} ({account_no})'
+        cursor.execute("""
+                       INSERT INTO accounts_driverwallettransaction (driver_id, amount, transaction_type, description, created_at)
+                       VALUES (%s, %s, 'wallet_withdraw', %s, NOW())
+                       """, [driver_id, -amount, desc])
+
+    return JsonResponse({
+        'success': True,
+        'message': f'Withdrawal request for ৳{amount:.2f} BDT via {method} ({account_no}) submitted successfully!'
+    })
+
+
+@csrf_exempt
+def sslcommerz_success(request):
+    """SSLCommerz Success Callback (POST/GET)."""
+    post_data = request.POST if request.method == 'POST' else request.GET
+    tran_id = post_data.get('tran_id')
+    val_id = post_data.get('val_id')
+    amount_str = post_data.get('amount')
+
+    if not (tran_id and val_id):
+        messages.error(request, 'Invalid callback payload from SSLCommerz.')
+        return redirect('driver_earnings')
+
+    is_valid, validation_resp = validate_sslcommerz_payment(val_id)
+
+    if not is_valid:
+        messages.error(request, 'SSLCommerz payment validation failed.')
+        return redirect('driver_earnings')
+
+    amount = float(amount_str or validation_resp.get('amount', 0))
+
+    if tran_id.startswith('DRV-SETTLE-'):
+        parts = tran_id.split('-')
+        driver_id = int(parts[2])
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE accounts_driver SET wallet_balance = COALESCE(wallet_balance, 0) + %s WHERE driver_id = %s",
+                [amount, driver_id]
+            )
+
+            cursor.execute("""
+                           INSERT INTO accounts_payment (amount, status, payment_method, payment_type, tran_id, val_id,
+                                                         commission_amount, driver_amount)
+                           VALUES (%s, 'Paid', 'online', 'driver_settlement', %s, %s, 0.00, %s)
+                           """, [amount, tran_id, val_id, amount])
+
+            cursor.execute("""
+                           INSERT INTO accounts_driverwallettransaction (driver_id, amount, transaction_type, description, created_at)
+                           VALUES (%s, %s, 'wallet_topup', %s, NOW())
+                           """,
+                           [driver_id, amount, f'Wallet Settlement / Recharge via SSLCommerz (Tran ID: {tran_id})'])
+
+        messages.success(request, f'Successfully recharged ৳{amount:.2f} BDT to your driver wallet!')
+        return redirect('driver_earnings')
+
+    elif tran_id.startswith('PASS-RIDE-'):
+        parts = tran_id.split('-')
+        request_id = int(parts[2])
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT passenger_id, ride_id FROM accounts_riderequest WHERE ride_request_id = %s",
+                [request_id]
+            )
+            row = cursor.fetchone()
+            passenger_id = row[0] if row else None
+            ride_id = row[1] if row else None
+
+            cursor.execute(
+                "UPDATE accounts_riderequest SET payment_method = 'online' WHERE ride_request_id = %s",
+                [request_id]
+            )
+
+            comm_amount = round(amount * 0.15, 2)
+            drv_amount = round(amount * 0.85, 2)
+
+            cursor.execute("""
+                           INSERT INTO accounts_payment (amount, status, payment_method, payment_type, tran_id, val_id,
+                                                         passenger_id, ride_id, commission_amount, driver_amount)
+                           VALUES (%s, 'Paid', 'online', 'ride_fare', %s, %s, %s, %s, %s, %s)
+                           """, [amount, tran_id, val_id, passenger_id, ride_id, comm_amount, drv_amount])
+
+        messages.success(request, f'Payment of ৳{amount:.2f} BDT completed successfully via SSLCommerz!')
+        return redirect('passenger_dashboard')
+
+    messages.success(request, 'Payment completed successfully.')
+    return redirect('passenger_dashboard')
+
+
+@csrf_exempt
+def sslcommerz_fail(request):
+    messages.error(request, 'Payment failed or was declined by SSLCommerz.')
+    role = request.session.get('role')
+    if role == 'driver':
+        return redirect('driver_earnings')
+    return redirect('passenger_dashboard')
+
+
+@csrf_exempt
+def sslcommerz_cancel(request):
+    messages.info(request, 'Payment process was cancelled.')
+    role = request.session.get('role')
+    if role == 'driver':
+        return redirect('driver_earnings')
+    return redirect('passenger_dashboard')
 
     # functions added for multi ride calculations
 
@@ -741,11 +1494,12 @@ def check_feasibility(data, ride_start_loc, ride_id):
     """
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT end_lat, end_lng, passenger_id
-            FROM accounts_riderequest
-            WHERE ride_id = %s AND status IN ('Pending', 'Accepted')
-            ORDER BY dropoff ASC
-        """, [ride_id])
+                       SELECT end_lat, end_lng, passenger_id
+                       FROM accounts_riderequest
+                       WHERE ride_id = %s
+                         AND status IN ('Pending', 'Accepted')
+                       ORDER BY dropoff ASC
+                       """, [ride_id])
         rows = cursor.fetchall()
     print("CHECKING RIDE:", ride_id)
     print("ROWS:", rows)
@@ -861,20 +1615,20 @@ def apply_join(data, ride_id, ride_start_location, ride_start_loc, feasibility_r
 
         # Insert the new passenger at the insertion slot
         cursor.execute("""
-            INSERT INTO accounts_riderequest
-            (status, date, time, start_location, start_lat, start_lng,
-             end_location, end_lat, end_lng, estimated_fare,
-             requested_vehicle_type, requested_capacity,
-             passenger_id, ride_id, coupon_id, dropoff)
-            VALUES (%s, CURRENT_DATE, CURRENT_TIME, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NULL, %s)
-            RETURNING ride_request_id
-        """, [
-            new_status,ride_start_location,
-            ride_start_loc[0], ride_start_loc[1],
-            data['end_location'], data['end_lat'], data['end_lng'],
-            new_passenger_fare, 'Car', 4,
-            user_id, ride_id, insertion_idx
-        ])
+                       INSERT INTO accounts_riderequest
+                       (status, date, time, start_location, start_lat, start_lng,
+                        end_location, end_lat, end_lng, estimated_fare,
+                        requested_vehicle_type, requested_capacity,
+                        passenger_id, ride_id, coupon_id, dropoff)
+                       VALUES (%s, CURRENT_DATE, CURRENT_TIME, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NULL,
+                               %s) RETURNING ride_request_id
+                       """, [
+                           new_status, ride_start_location,
+                           ride_start_loc[0], ride_start_loc[1],
+                           data['end_location'], data['end_lat'], data['end_lng'],
+                           new_passenger_fare, 'Car', 4,
+                           user_id, ride_id, insertion_idx
+                       ])
         new_request_id = cursor.fetchone()[0]
 
     return new_passenger_fare, new_request_id
@@ -899,7 +1653,7 @@ def check_joinable_rides(request):
     with connection.cursor() as cursor:
         cursor.execute("SELECT ride_id FROM accounts_ride WHERE status IN ('Pending', 'Accepted')")
         current_ride_ids = [row[0] for row in cursor.fetchall()]
-    #debugging
+    # debugging
     print("ALL RIDES:", current_ride_ids)
 
     possible_rides = {}  # ride_id -> ride_start_loc tuple
@@ -931,12 +1685,12 @@ def check_joinable_rides(request):
             start_lat, start_lng
         )
 
-        if distance is not None and distance <= 0.1 and capacity>num_passengers:
+        if distance is not None and distance <= 0.1 and capacity > num_passengers:
             possible_rides[ride_id] = ride_start
 
         print("DISTANCE:", distance, "km")
 
-    #debugging
+    # debugging
     print("POSSIBLE RIDES:", possible_rides)
 
     feasible_rides = []

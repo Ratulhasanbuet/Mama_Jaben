@@ -146,3 +146,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 load_dotenv()
 
 GOOGLE_MAPS_API_KEY = os.getenv('GOOGLE_MAPS_API_KEY')
+
+SSLCOMMERZ_STORE_ID = os.getenv('SSLCZ_STORE_ID')
+SSLCOMMERZ_STORE_PASS = os.getenv('SSLCZ_STORE_PASS')
+SSLCOMMERZ_IS_SANDBOX = os.getenv('SSLCZ_IS_SANDBOX', 'True') == 'True'

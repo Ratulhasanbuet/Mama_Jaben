@@ -56,8 +56,10 @@
           >
         </a>
         <div class="flex items-center gap-4">
-          <span class="hidden sm:block text-sm text-muted">Hi, <span class="font-semibold text-ink">{{ driver.name }}</span></span>
-          <a href="{% url 'logout' %}" class="text-sm font-semibold text-muted hover:text-ink px-3 py-2 transition-colors">Log Out</a>
+          <a href="{% url 'driver_rides' %}" class="hidden sm:inline-block text-sm font-semibold text-muted hover:text-ink transition-colors">Nearby Rides</a>
+          <a href="{% url 'driver_earnings' %}" class="hidden sm:inline-block text-sm font-semibold text-muted hover:text-ink transition-colors">Earnings</a>
+          <span class="hidden sm:block text-sm text-muted">| Hi, <span class="font-semibold text-ink">{{ driver.name }}</span></span>
+          <a href="{% url 'logout' %}" class="text-sm font-semibold text-muted hover:text-ink px-2 py-1 transition-colors">Log Out</a>
         </div>
       </div>
     </header>
@@ -187,7 +189,7 @@
             <p class="text-sm font-semibold text-ink mt-0.5">{{ vehicle.vehicle_license }}</p>
           </div>
         </div>
-        <div>
+        <div class="flex items-center justify-center gap-3 flex-wrap">
           <a
             href="{% url 'driver_rides' %}"
             class="inline-flex items-center gap-2 mt-6 bg-ink hover:bg-emerald-deep text-white font-semibold text-sm px-6 py-3.5 rounded-lg shadow-soft transition-colors"
@@ -196,6 +198,15 @@
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none">
               <path d="M5 12h14M13 5l7 7-7 7" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
+          </a>
+          <a
+            href="{% url 'driver_earnings' %}"
+            class="inline-flex items-center gap-2 mt-6 bg-emerald-light hover:bg-emerald-ring text-emerald-dark font-semibold text-sm px-6 py-3.5 rounded-lg border border-emerald-ring shadow-soft transition-colors"
+          >
+            <svg class="w-4 h-4 text-emerald-dark" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            Earnings Dashboard
           </a>
         </div>
       </div>

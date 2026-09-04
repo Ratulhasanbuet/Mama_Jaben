@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Driver Earnings — Mama Jaben?</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              ink: "#0D1420",
+              muted: "#5B6472",
+              card: "#FFFFFF",
+              emerald: { DEFAULT: "#0E7A5A", dark: "#0A5E45", deep: "#0B3B2C", light: "#E7F3EC", ring: "#BFDECC" },
+              clay: { DEFAULT: "#9C5A33", dark: "#7E4826", light: "#F3EAE1", ring: "#E1CBB4" },
+              hairline: "rgba(13,20,32,0.09)",
+            },
+            fontFamily: {
+              display: ["Sora", "sans-serif"],
+              body: ["Inter", "sans-serif"],
+            },
+            boxShadow: {
+              soft: "0 1px 2px rgba(13,20,32,0.04), 0 10px 26px -14px rgba(13,20,32,0.22)",
+              softer: "0 1px 1px rgba(13,20,32,0.03), 0 2px 8px -3px rgba(13,20,32,0.08)",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      body { background: #f6f7f8; }
+    </style>
+  </head>
+  <body class="font-body text-ink antialiased">
+    <!-- ============ NAVBAR ============ -->
+    <header class="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-hairline">
+      <div class="max-w-4xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
+        <a href="{% url 'driver_dashboard' %}" class="flex items-center gap-2.5">
+          <span class="relative w-9 h-9 grid place-items-center rounded-lg bg-ink">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+              <path d="M12 22s7-7.58 7-12.5A7 7 0 0 0 5 9.5C5 14.42 12 22 12 22Z" fill="white" />
+              <circle cx="12" cy="9.5" r="2.6" fill="#0D1420" />
+            </svg>
+          </span>
+          <span class="font-display font-bold text-lg tracking-tight text-ink"
+            >Mama <span class="text-emerald">Jaben?</span>
+            <span class="text-muted font-medium text-sm">· Driver</span></span
+          >
+        </a>
+        <div class="flex items-center gap-3 sm:gap-5 text-sm font-semibold">
+          <a href="{% url 'driver_dashboard' %}" class="text-muted hover:text-ink transition-colors">Dashboard</a>
+          <a href="{% url 'driver_rides' %}" class="text-muted hover:text-ink transition-colors">Nearby Rides</a>
+          <a href="{% url 'driver_earnings' %}" class="text-emerald-dark font-bold underline underline-offset-4 decoration-2">Earnings</a>
+          <a href="{% url 'logout' %}" class="text-muted hover:text-ink ml-2 transition-colors">Log Out</a>
+        </div>
+      </div>
+    </header>
+
+    <!-- ============ MESSAGES ============ -->
+    {% if messages %}
+    <div class="max-w-4xl mx-auto px-5 sm:px-8 pt-4">
+      {% for message in messages %}
+      <div
+        class="mb-3 px-4 py-3 rounded-lg text-sm font-medium border {% if message.tags == 'success' %}bg-emerald-light text-emerald-dark border-emerald-ring{% elif message.tags == 'error' %}bg-red-50 text-red-700 border-red-200{% else %}bg-clay-light text-clay-dark border-clay-ring{% endif %}"
+      >
+        {{ message }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <main class="max-w-4xl mx-auto px-5 sm:px-8 py-8 sm:py-10">
+      <!-- Title & Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 class="font-display font-bold text-2xl sm:text-3xl text-ink">Earnings Dashboard</h1>
+          <p class="text-muted mt-1 text-sm">Overview of your revenue, completed trips, and performance metrics.</p>
+        </div>
+        <a
+          href="{% url 'driver_rides' %}"
+          class="inline-flex items-center gap-2 bg-ink hover:bg-emerald-deep text-white font-semibold text-sm px-4 py-2.5 rounded-lg shadow-soft transition-colors self-start sm:self-auto"
+        >
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" />
+            <path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+          Find Rides
+        </a>
+      </div>
+
+      <!-- KPI Summary Cards Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-4 gap-5 mt-8">
+        <!-- Driver Wallet Balance Card -->
+        <div class="bg-card rounded-xl border {% if is_blocked %}border-red-300 bg-red-50/30{% else %}border-hairline{% endif %} shadow-softer p-6 relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-muted">Wallet Balance</span>
+            <div class="w-10 h-10 rounded-lg {% if is_blocked %}bg-red-100 text-red-700{% elif wallet_balance < 0 %}bg-amber-100 text-amber-700{% else %}bg-emerald-light text-emerald-dark{% endif %} grid place-items-center">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none">
+                <rect x="2" y="5" width="20" height="14" rx="2" stroke="currentColor" stroke-width="2" />
+                <line x1="2" y1="10" x2="22" y2="10" stroke="currentColor" stroke-width="2" />
+              </svg>
+            </div>
+          </div>
+          <p class="font-display font-extrabold text-3xl {% if wallet_balance < 0 %}text-red-600{% else %}text-emerald-dark{% endif %} mt-4">৳{{ wallet_balance|floatformat:2 }}</p>
+          <div class="mt-2 flex items-center justify-between">
+            {% if is_blocked %}
+            <span class="inline-block text-[11px] font-bold text-red-700 bg-red-100 border border-red-200 px-2 py-0.5 rounded">Restricted (&lt; -500 ৳)</span>
+            {% else %}
+            <span class="inline-block text-[11px] font-bold text-emerald-dark bg-emerald-light border border-emerald-ring px-2 py-0.5 rounded">Active</span>
+            {% endif %}
+            {% if wallet_balance > 0 %}
+            <button type="button" onclick="openWithdrawModal()" class="text-xs font-bold text-emerald hover:underline">Cash Out &rarr;</button>
+            {% else %}
+            <button type="button" onclick="openSettlementModal()" class="text-xs font-bold text-emerald hover:underline">Settle Dues &rarr;</button>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Total Earnings Card -->
+        <div class="bg-card rounded-xl border border-hairline shadow-softer p-6 relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-muted">Gross Revenue</span>
+            <div class="w-10 h-10 rounded-lg bg-emerald-light text-emerald-dark grid place-items-center">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+          </div>
+          <p class="font-display font-extrabold text-3xl text-emerald-dark mt-4">৳{{ total_earnings|floatformat:2 }}</p>
+          <p class="text-xs text-muted mt-1">Lifetime trip revenues</p>
+        </div>
+
+        <!-- Total Completed Rides Card -->
+        <div class="bg-card rounded-xl border border-hairline shadow-softer p-6 relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-muted">Completed Rides</span>
+            <div class="w-10 h-10 rounded-lg bg-blue-50 text-blue-700 grid place-items-center">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M22 4L12 14.01l-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+          </div>
+          <p class="font-display font-extrabold text-3xl text-ink mt-4">{{ total_completed }}</p>
+          <p class="text-xs text-muted mt-1">Total trips completed</p>
+        </div>
+
+        <!-- Average Fare Card -->
+        <div class="bg-card rounded-xl border border-hairline shadow-softer p-6 relative overflow-hidden">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-muted">Avg. Fare / Ride</span>
+            <div class="w-10 h-10 rounded-lg bg-clay-light text-clay-dark grid place-items-center">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none">
+                <path d="M3 3v18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M18 9l-5 5-4-4-4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+          </div>
+          <p class="font-display font-extrabold text-3xl text-ink mt-4">৳{{ avg_fare|floatformat:2 }}</p>
+          <p class="text-xs text-muted mt-1">Average per ride</p>
+        </div>
+      </div>
+
+      <!-- Settle Dues / Recharge CTA Banner if Restricted -->
+      {% if is_blocked %}
+      <div class="mt-6 bg-red-50 border border-red-200 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 class="font-display font-bold text-red-800 text-base">Account Restricted: Wallet Balance Exceeds Limit</h3>
+          <p class="text-xs text-red-700 mt-1">Your wallet balance is <strong>৳{{ wallet_balance|floatformat:2 }} BDT</strong>, which is below the <strong>-৳500.00 BDT</strong> limit. Please settle your dues via SSLCommerz to unlock ride acceptance.</p>
+        </div>
+        <button type="button" onclick="openSettlementModal()" class="shrink-0 bg-red-700 hover:bg-red-800 text-white font-semibold text-xs px-5 py-3 rounded-lg shadow-soft transition-colors">
+          Settle Dues via SSLCommerz
+        </button>
+      </div>
+      {% endif %}
+
+      <!-- Wallet Transaction Ledger Table -->
+      <div class="mt-10 bg-card rounded-xl border border-hairline shadow-softer overflow-hidden">
+        <div class="px-6 py-5 border-b border-hairline flex items-center justify-between">
+          <h2 class="font-display font-bold text-lg text-ink">Driver Wallet Ledger</h2>
+          <div class="flex items-center gap-3">
+            {% if wallet_balance > 0 %}
+            <button type="button" onclick="openWithdrawModal()" class="text-xs font-bold text-white bg-emerald-dark hover:bg-emerald-deep px-3 py-1 rounded-lg shadow-soft transition-colors">💸 Cash Out / Withdraw</button>
+            {% endif %}
+            <button type="button" onclick="openSettlementModal()" class="text-xs font-semibold text-emerald-dark hover:underline">+ Top Up Wallet</button>
+          </div>
+        </div>
+        {% if wallet_transactions %}
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm border-collapse">
+            <thead>
+              <tr class="bg-gray-50/70 border-b border-hairline text-[11px] font-bold uppercase tracking-wider text-muted">
+                <th class="py-3.5 px-6">Tx ID</th>
+                <th class="py-3.5 px-6">Description</th>
+                <th class="py-3.5 px-6">Type</th>
+                <th class="py-3.5 px-6">Date</th>
+                <th class="py-3.5 px-6 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-hairline">
+              {% for tx in wallet_transactions %}
+              <tr class="hover:bg-gray-50/50 transition-colors">
+                <td class="py-4 px-6 font-mono text-xs text-ink">#{{ tx.transaction_id }}</td>
+                <td class="py-4 px-6 text-xs text-ink font-medium">{{ tx.description }}</td>
+                <td class="py-4 px-6 text-xs">
+                  {% if tx.transaction_type == 'wallet_topup' or tx.transaction_type == 'online_ride_credit' %}
+                  <span class="inline-block text-[11px] font-semibold text-emerald-dark bg-emerald-light border border-emerald-ring px-2 py-0.5 rounded">Credit</span>
+                  {% elif tx.transaction_type == 'wallet_withdraw' %}
+                  <span class="inline-block text-[11px] font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded">Cash Out</span>
+                  {% else %}
+                  <span class="inline-block text-[11px] font-semibold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded">Debit</span>
+                  {% endif %}
+                </td>
+                <td class="py-4 px-6 text-xs text-muted">{{ tx.created_at }}</td>
+                <td class="py-4 px-6 text-right font-display font-bold text-xs {% if tx.amount >= 0 %}text-emerald-dark{% else %}text-red-600{% endif %}">
+                  {% if tx.amount >= 0 %}+৳{{ tx.amount|floatformat:2 }}{% else %}-৳{{ tx.abs_amount|floatformat:2 }}{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-xs text-muted px-6 py-6 text-center">No wallet transactions recorded yet.</p>
+        {% endif %}
+      </div>
+
+      <!-- Completed Trips Table -->
+      <div class="mt-10 bg-card rounded-xl border border-hairline shadow-softer overflow-hidden">
+        <div class="px-6 py-5 border-b border-hairline flex items-center justify-between">
+          <h2 class="font-display font-bold text-lg text-ink">Completed Trip History</h2>
+          <span class="text-xs font-medium text-muted bg-gray-100 px-3 py-1 rounded-full">{{ total_completed }} Rides</span>
+        </div>
+
+        {% if completed_rides %}
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm border-collapse">
+            <thead>
+              <tr class="bg-gray-50/70 border-b border-hairline text-[11px] font-bold uppercase tracking-wider text-muted">
+                <th class="py-3.5 px-6">Ride ID</th>
+                <th class="py-3.5 px-6">Route (Pickup &rarr; Dropoff)</th>
+                <th class="py-3.5 px-6">Date & Time</th>
+                <th class="py-3.5 px-6 text-center">Passengers</th>
+                <th class="py-3.5 px-6 text-right">Earned Fare</th>
+                <th class="py-3.5 px-6 text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-hairline">
+              {% for ride in completed_rides %}
+              <tr class="hover:bg-gray-50/50 transition-colors">
+                <td class="py-4 px-6 font-semibold text-ink">#{{ ride.ride_id }}</td>
+                <td class="py-4 px-6 max-w-xs">
+                  <div class="flex flex-col">
+                    <span class="font-medium text-ink truncate">{{ ride.start_location }}</span>
+                    <span class="text-xs text-muted truncate mt-0.5">&rarr; {{ ride.end_location }}</span>
+                  </div>
+                </td>
+                <td class="py-4 px-6 text-muted text-xs whitespace-nowrap">
+                  <span class="font-medium text-ink block">{{ ride.date }}</span>
+                  <span>{{ ride.time }}</span>
+                </td>
+                <td class="py-4 px-6 text-center whitespace-nowrap">
+                  <span class="inline-flex items-center gap-1 bg-gray-100 text-ink px-2.5 py-1 rounded-full text-xs font-semibold">
+                    <svg class="w-3.5 h-3.5 text-muted" viewBox="0 0 24 24" fill="none">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="2" />
+                      <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2" />
+                    </svg>
+                    {{ ride.passenger_count }}
+                  </span>
+                </td>
+                <td class="py-4 px-6 text-right font-display font-bold text-emerald-dark text-base whitespace-nowrap">
+                  +৳{{ ride.fare|floatformat:2 }}
+                </td>
+                <td class="py-4 px-6 text-center whitespace-nowrap">
+                  <span class="inline-block text-xs font-semibold text-emerald-dark bg-emerald-light border border-emerald-ring px-2.5 py-1 rounded-full">
+                    Completed
+                  </span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center py-16 px-4">
+          <div class="w-12 h-12 mx-auto rounded-full bg-gray-100 grid place-items-center text-muted mb-3">
+            <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none">
+              <path d="M12 8v4l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" />
+            </svg>
+          </div>
+          <h3 class="font-display font-bold text-base text-ink">No completed rides yet</h3>
+          <p class="text-xs text-muted mt-1 max-w-sm mx-auto">Once you accept and complete rides, your trip history and total earnings will appear here.</p>
+          <a
+            href="{% url 'driver_rides' %}"
+            class="inline-flex items-center gap-2 mt-5 bg-ink hover:bg-emerald-deep text-white font-semibold text-xs px-4 py-2.5 rounded-lg shadow-soft transition-colors"
+          >
+            Start Driving Now
+          </a>
+        </div>
+        {% endif %}
+      </div>
+    </main>
+
+    <!-- Modal: Cash Out / Withdraw Balance -->
+    <div id="withdraw-modal" class="fixed inset-0 bg-ink/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+      <div class="bg-white rounded-xl shadow-soft max-w-md w-full p-6 relative">
+        <button type="button" onclick="closeWithdrawModal()" class="absolute top-4 right-4 text-muted hover:text-ink">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <h3 class="font-display font-bold text-lg text-ink">Cash Out / Withdraw Earnings</h3>
+        <p class="text-xs text-muted mt-1">Withdraw funds directly to your bKash, Nagad, Rocket or Bank account.</p>
+        
+        <div class="mt-4 space-y-3">
+          <div>
+            <label for="withdraw-amount-input" class="block text-xs font-semibold text-ink mb-1">Withdrawal Amount (BDT)</label>
+            <div class="relative">
+              <span class="absolute left-3 top-2.5 text-sm font-bold text-muted">৳</span>
+              <input type="number" id="withdraw-amount-input" min="10" max="{{ wallet_balance }}" step="10" placeholder="500" value="{{ wallet_balance|floatformat:0 }}" class="w-full pl-8 pr-3 py-2 border border-hairline rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-ring font-bold text-ink">
+            </div>
+            <p class="text-[11px] text-muted mt-1">Available for cash out: <strong class="text-emerald-dark">৳{{ wallet_balance|floatformat:2 }} BDT</strong></p>
+          </div>
+
+          <div>
+            <label for="withdraw-method-select" class="block text-xs font-semibold text-ink mb-1">Select Payment Channel</label>
+            <select id="withdraw-method-select" class="w-full px-3 py-2 border border-hairline rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-ring font-medium">
+              <option value="bKash">bKash Personal</option>
+              <option value="Nagad">Nagad Personal</option>
+              <option value="Rocket">Rocket Mobile Banking</option>
+              <option value="Bank">Bank Account Transfer</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="withdraw-account-input" class="block text-xs font-semibold text-ink mb-1">Mobile / Account Number</label>
+            <input type="text" id="withdraw-account-input" placeholder="017XXXXXXXX" value="{{ driver.phone }}" class="w-full px-3 py-2 border border-hairline rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-ring font-mono text-ink">
+          </div>
+        </div>
+
+        <div class="mt-6 flex justify-end gap-3">
+          <button type="button" onclick="closeWithdrawModal()" class="px-4 py-2 text-xs font-semibold border border-hairline rounded-lg text-muted hover:bg-canvas">Cancel</button>
+          <button type="button" id="submit-withdraw-btn" onclick="submitWithdraw()" class="px-5 py-2 text-xs font-semibold bg-emerald-dark hover:bg-emerald-deep text-white rounded-lg shadow-soft">Confirm Cash Out</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Settle Dues / Recharge via SSLCommerz -->
+    <div id="settlement-modal" class="fixed inset-0 bg-ink/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+      <div class="bg-white rounded-xl shadow-soft max-w-md w-full p-6 relative">
+        <button type="button" onclick="closeSettlementModal()" class="absolute top-4 right-4 text-muted hover:text-ink">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <h3 class="font-display font-bold text-lg text-ink">Settle Dues / Recharge Wallet</h3>
+        <p class="text-xs text-muted mt-1">Pay via SSLCommerz Sandbox (bKash, Nagad, Visa, Mastercard)</p>
+        <div class="mt-4">
+          <label for="settlement-amount-input" class="block text-xs font-semibold text-ink mb-1">Enter Recharge Amount (BDT)</label>
+          <div class="relative">
+            <span class="absolute left-3 top-2.5 text-sm font-bold text-muted">৳</span>
+            <input type="number" id="settlement-amount-input" min="10" step="10" placeholder="500" value="500" class="w-full pl-8 pr-3 py-2 border border-hairline rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-ring font-bold text-ink">
+          </div>
+          <p class="text-[11px] text-muted mt-1.5">Current Balance: <strong class="{% if wallet_balance < 0 %}text-red-600{% else %}text-emerald-dark{% endif %}">৳{{ wallet_balance|floatformat:2 }} BDT</strong></p>
+        </div>
+        <div class="mt-6 flex justify-end gap-3">
+          <button type="button" onclick="closeSettlementModal()" class="px-4 py-2 text-xs font-semibold border border-hairline rounded-lg text-muted hover:bg-canvas">Cancel</button>
+          <button type="button" id="pay-ssl-btn" onclick="submitSettlement()" class="px-5 py-2 text-xs font-semibold bg-emerald-dark hover:bg-emerald-deep text-white rounded-lg shadow-soft">Proceed to SSLCommerz</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function openWithdrawModal() {
+        document.getElementById('withdraw-modal').classList.remove('hidden');
+        document.getElementById('withdraw-modal').classList.add('flex');
+      }
+      function closeWithdrawModal() {
+        document.getElementById('withdraw-modal').classList.add('hidden');
+        document.getElementById('withdraw-modal').classList.remove('flex');
+      }
+      async function submitWithdraw() {
+        const amount = document.getElementById('withdraw-amount-input').value;
+        const method = document.getElementById('withdraw-method-select').value;
+        const accountNo = document.getElementById('withdraw-account-input').value;
+        const btn = document.getElementById('submit-withdraw-btn');
+
+        if (!amount || parseFloat(amount) <= 0) {
+          alert('Please enter a valid cash out amount.');
+          return;
+        }
+        if (!accountNo) {
+          alert('Please enter a valid phone or account number.');
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Processing Cash Out...';
+
+        try {
+          const res = await fetch("{% url 'request_driver_withdraw' %}", {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+              'amount': amount,
+              'payment_method': method,
+              'account_number': accountNo
+            })
+          });
+          const data = await res.json();
+          if (data.success) {
+            alert(data.message);
+            window.location.reload();
+          } else {
+            alert(data.error || 'Failed to process withdrawal.');
+            btn.disabled = false;
+            btn.textContent = 'Confirm Cash Out';
+          }
+        } catch (err) {
+          alert('Network error. Please try again.');
+          btn.disabled = false;
+          btn.textContent = 'Confirm Cash Out';
+        }
+      }
+
+      function openSettlementModal() {
+        document.getElementById('settlement-modal').classList.remove('hidden');
+        document.getElementById('settlement-modal').classList.add('flex');
+      }
+      function closeSettlementModal() {
+        document.getElementById('settlement-modal').classList.add('hidden');
+        document.getElementById('settlement-modal').classList.remove('flex');
+      }
+      async function submitSettlement() {
+        const amount = document.getElementById('settlement-amount-input').value;
+        const btn = document.getElementById('pay-ssl-btn');
+        if (!amount || parseFloat(amount) <= 0) {
+          alert('Please enter a valid amount');
+          return;
+        }
+        btn.disabled = true;
+        btn.textContent = 'Redirecting to SSLCommerz...';
+
+        try {
+          const res = await fetch("{% url 'initiate_driver_settlement' %}", {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({ 'amount': amount })
+          });
+          const data = await res.json();
+          if (data.success && data.gateway_url) {
+            window.location.href = data.gateway_url;
+          } else {
+            alert(data.error || 'Failed to initiate payment.');
+            btn.disabled = false;
+            btn.textContent = 'Proceed to SSLCommerz';
+          }
+        } catch (err) {
+          alert('Network error. Please try again.');
+          btn.disabled = false;
+          btn.textContent = 'Proceed to SSLCommerz';
+        }
+      }
+    </script>
+  </body>
+</html>
+
