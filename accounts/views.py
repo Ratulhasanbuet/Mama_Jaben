@@ -159,7 +159,8 @@ def passenger_dashboard(request):
                               rr.requested_capacity,
                               d.name,
                               rr.payment_method,
-                              pay.status AS payment_status
+                              pay.status AS payment_status,
+                              rr.ride_id
                        FROM accounts_riderequest rr
                                 LEFT JOIN accounts_ride r ON rr.ride_id = r.ride_id
                                 LEFT JOIN accounts_driver d ON r.driver_id = d.driver_id
@@ -199,6 +200,7 @@ def passenger_dashboard(request):
             'driver_name': row[9],
             'payment_method': row[10],
             'is_paid': (row[11] == 'Paid'),
+            'ride_id': row[12],
         }
         for row in ride_rows
     ]
@@ -440,10 +442,10 @@ def confirm_booking(request):
                        VALUES (%s, CURRENT_DATE, CURRENT_TIME, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                                %s) RETURNING ride_request_id
                        """, [
-                           'Pending', start_location, start_lat, start_lng, end_location, end_lat, end_lng,
-                           estimated_fare, option['type'], option['capacity'], payment_method, user_id, new_ride_id,
-                           coupon_code
-                       ])
+            'Pending', start_location, start_lat, start_lng, end_location, end_lat, end_lng,
+            estimated_fare, option['type'], option['capacity'], payment_method, user_id, new_ride_id,
+            coupon_code
+        ])
         new_request_id = cursor.fetchone()[0]
 
         cursor.execute("SELECT name, email, phone FROM accounts_passenger WHERE user_id = %s", [user_id])
@@ -1483,15 +1485,6 @@ def get_road_dist(lat1, lng1, lat2, lng2):
 
 
 def check_feasibility(data, ride_start_loc, ride_id):
-    """
-    Tries to find the cheapest valid insertion slot for the new passenger's dropoff.
-
-    data: dict with 'end_lat', 'end_lng', 'end_location', 'passenger_id', 'estimated_fare'
-    ride_start_loc: (lat, lng) tuple — the shared pickup point
-    ride_id: the ride we're trying to join
-
-    Returns (insertion_index, best_new_dist) if feasible, or None if not.
-    """
     with connection.cursor() as cursor:
         cursor.execute("""
                        SELECT end_lat, end_lng, passenger_id
@@ -1500,136 +1493,436 @@ def check_feasibility(data, ride_start_loc, ride_id):
                          AND status IN ('Pending', 'Accepted')
                        ORDER BY dropoff ASC
                        """, [ride_id])
+
         rows = cursor.fetchall()
-    print("CHECKING RIDE:", ride_id)
+
+    print("\n========== CHECKING RIDE", ride_id, "==========")
     print("ROWS:", rows)
+
     if not rows:
         return None
 
-    # Build the full sequence: [start, stop0, stop1, stop2, ...]
-    # start is at index 0, existing dropoffs follow in order
-    sequence = [ride_start_loc] + [(row[0], row[1]) for row in rows]
-    passenger_ids = [row[2] for row in rows]
-    n = len(sequence)  # includes the start point
+    # Existing route:
+    # S -> A -> B -> C ...
+    sequence = [
+                   ride_start_loc
+               ] + [
+                   (row[0], row[1]) for row in rows
+               ]
 
-    # Step 1: compute total distance of the CURRENT route (start → stop0 → stop1 → ...)
+    passenger_ids = [row[2] for row in rows]
+
+    # --------------------------------------------------
+    # 1. Calculate current route distance
+    # --------------------------------------------------
+
     current_dist = 0
-    for i in range(n - 1):
-        d = get_road_dist(sequence[i][0], sequence[i][1], sequence[i + 1][0], sequence[i + 1][1])
+
+    for i in range(len(sequence) - 1):
+
+        d = get_road_dist(
+            sequence[i][0],
+            sequence[i][1],
+            sequence[i + 1][0],
+            sequence[i + 1][1]
+        )
+
         if d is None:
             return None
+
         current_dist += d
 
-    # Step 2: new passenger's direct distance from start (their baseline)
-    new_e = (data['end_lat'], data['end_lng'])
-    new_baseline = get_road_dist(ride_start_loc[0], ride_start_loc[1], new_e[0], new_e[1])
+    print("CURRENT ROUTE DISTANCE:", current_dist)
+
+    # --------------------------------------------------
+    # 2. New passenger destination
+    # --------------------------------------------------
+
+    new_e = (
+        data['end_lat'],
+        data['end_lng']
+    )
+
+    # Direct distance from shared pickup to new passenger
+    new_baseline = get_road_dist(
+        ride_start_loc[0],
+        ride_start_loc[1],
+        new_e[0],
+        new_e[1]
+    )
+
     if new_baseline is None:
         return None
 
-    # Step 3: try inserting E at each possible slot
-    # slot i means: insert between sequence[i] and sequence[i+1]
-    # valid slots: 0 to n-1 (n slots total for n points in sequence)
+    print("NEW PASSENGER BASELINE:", new_baseline)
+
+    # --------------------------------------------------
+    # 3. Try every insertion position
+    # --------------------------------------------------
+
     best_slot = None
     best_new_dist = None
     best_detour = float('inf')
+    best_passenger_detour = None
 
-    for i in range(n):
-        if i < n - 1:
-            # inserting between sequence[i] and sequence[i+1]
-            dist_to_e = get_road_dist(sequence[i][0], sequence[i][1], new_e[0], new_e[1])
-            dist_from_e = get_road_dist(new_e[0], new_e[1], sequence[i + 1][0], sequence[i + 1][1])
-            dist_skipped = get_road_dist(sequence[i][0], sequence[i][1], sequence[i + 1][0], sequence[i + 1][1])
+    for i in range(len(sequence)):
 
-            if None in (dist_to_e, dist_from_e, dist_skipped):
+        print("\n--- INSERTION SLOT:", i, "---")
+
+        # ==============================================
+        # Insert between sequence[i] and sequence[i+1]
+        # ==============================================
+
+        if i < len(sequence) - 1:
+
+            dist_to_e = get_road_dist(
+                sequence[i][0],
+                sequence[i][1],
+                new_e[0],
+                new_e[1]
+            )
+
+            dist_from_e = get_road_dist(
+                new_e[0],
+                new_e[1],
+                sequence[i + 1][0],
+                sequence[i + 1][1]
+            )
+
+            dist_skipped = get_road_dist(
+                sequence[i][0],
+                sequence[i][1],
+                sequence[i + 1][0],
+                sequence[i + 1][1]
+            )
+
+            if None in (
+                    dist_to_e,
+                    dist_from_e,
+                    dist_skipped
+            ):
                 continue
 
-            new_total = current_dist + dist_to_e + dist_from_e - dist_skipped
+            new_total = (
+                    current_dist
+                    + dist_to_e
+                    + dist_from_e
+                    - dist_skipped
+            )
+
+        # ==============================================
+        # Insert at the very end
+        # ==============================================
 
         else:
-            # inserting at the very end (after the last existing stop)
-            dist_to_e = get_road_dist(sequence[-1][0], sequence[-1][1], new_e[0], new_e[1])
+
+            dist_to_e = get_road_dist(
+                sequence[-1][0],
+                sequence[-1][1],
+                new_e[0],
+                new_e[1]
+            )
+
             if dist_to_e is None:
                 continue
+
             new_total = current_dist + dist_to_e
 
-        detour_added = new_total - current_dist  # how much longer does the route get?
+        # --------------------------------------------------
+        # Existing passengers' route detour
+        # --------------------------------------------------
 
-        # Check 1: does the route grow by more than 1km? (protects existing passengers)
+        detour_added = new_total - current_dist
+
+        print("NEW TOTAL:", new_total)
+        print("EXISTING ROUTE DETOUR:", detour_added)
+
         if detour_added > 1.0:
-            print("Rejected: existing route detour =", detour_added)
+            print(" REJECTED: existing route detour > 1 km")
             continue
 
-        # Check 2: is the new passenger's actual distance from pickup to their stop
-        # within 1km of their direct baseline? (protects the new passenger too)
-        # Their distance = everything up to insertion point + dist_to_e
-        dist_to_insertion_point = 0.0
-        if i > 0:
-            for j in range(i):
-                dist = get_road_dist(
-                    sequence[j][0], sequence[j][1], sequence[j + 1][0], sequence[j + 1][1]
-                )
-                if dist is not None:
-                    dist_to_insertion_point += dist
-        new_passenger_travel = dist_to_insertion_point + dist_to_e
-        if new_passenger_travel - new_baseline > 1.0:
-            print(
-                "Rejected: new passenger detour =",
-                new_passenger_travel - new_baseline
+        # --------------------------------------------------
+        # Distance travelled by NEW passenger
+        # --------------------------------------------------
+
+        dist_to_insertion_point = 0
+
+        for j in range(i):
+
+            d = get_road_dist(
+                sequence[j][0],
+                sequence[j][1],
+                sequence[j + 1][0],
+                sequence[j + 1][1]
             )
+
+            if d is None:
+                dist_to_insertion_point = None
+                break
+
+            dist_to_insertion_point += d
+
+        if dist_to_insertion_point is None:
             continue
 
-        # This slot works — is it the cheapest so far?
+        new_passenger_travel = (
+                dist_to_insertion_point
+                + dist_to_e
+        )
+
+        new_passenger_detour = (
+                new_passenger_travel
+                - new_baseline
+        )
+
+        print(
+            "NEW PASSENGER TRAVEL:",
+            new_passenger_travel
+        )
+
+        print(
+            "NEW PASSENGER DETOUR:",
+            new_passenger_detour
+        )
+
+        """if new_passenger_detour > 1.0:
+
+            print("REJECTED: new passenger detour > 1 km")
+            continue"""
+        """"allow new passenger detour to be > 1km
+        """
+
+        # --------------------------------------------------
+        # Valid insertion
+        # --------------------------------------------------
+
+        # --------------------------------------------------
+        # Valid insertion
+        # --------------------------------------------------
+
+        print("VALID INSERTION")
+
         if detour_added < best_detour:
             best_detour = detour_added
             best_slot = i
             best_new_dist = new_total
+            best_passenger_detour = new_passenger_detour
 
-    return (best_slot, best_new_dist, passenger_ids) if best_slot is not None else None
+    # --------------------------------------------------
+    # 4. No valid insertion
+    # --------------------------------------------------
+
+    if best_slot is None:
+        print("NO FEASIBLE INSERTION")
+        return None
+
+    # --------------------------------------------------
+    # 5. Valid result
+    # --------------------------------------------------
+
+    print(
+        "BEST INSERTION:",
+        best_slot,
+        "DETOUR:",
+        best_passenger_detour
+    )
+
+    return (
+        best_slot,
+        best_new_dist,
+        best_passenger_detour,
+        passenger_ids
+    )
 
 
-def apply_join(data, ride_id, ride_start_location, ride_start_loc, feasibility_result, new_status):
-    """
-    Actually writes the join to the database:
-    - Updates dropoff for existing passengers shifted by the insertion
-    - Inserts the new passenger's RideRequest row
-    """
-    insertion_idx, new_total_dist, passenger_ids = feasibility_result
+def apply_join(data, ride_id, ride_start_location, ride_start_loc,
+               feasibility_result, new_status):
+    insertion_idx, new_total_dist, new_passenger_detour, passenger_ids = feasibility_result
     user_id = data['passenger_id']
 
-    # Fare split: proportional to distance each passenger travels
-    # Simple approximation: new passenger pays (their_dist / new_total_dist) * total_fare
-    # For now use the same base fare formula
-    option = VEHICLE_OPTIONS['car4']
-    total_fare = option['base'] + option['per_km'] * new_total_dist
-    new_passenger_fare = round(total_fare * 0.5)  # simplified: refine with real split later
+    # --------------------------------------------------
+    # 1. Get vehicle information
+    # --------------------------------------------------
 
     with connection.cursor() as cursor:
-        # Shift dropoff of everyone AT or AFTER the insertion point up by 1
-        # Passengers before insertion_idx are completely untouched
+        cursor.execute("""
+            SELECT requested_vehicle_type, requested_capacity
+            FROM accounts_riderequest
+            WHERE ride_id = %s
+              AND status IN ('Pending', 'Accepted')
+            ORDER BY dropoff ASC
+            LIMIT 1
+        """, [ride_id])
+
+        existing_vehicle = cursor.fetchone()
+
+    if not existing_vehicle:
+        return None
+
+    vehicle_type, capacity = existing_vehicle
+
+    if capacity == 8:
+        option = VEHICLE_OPTIONS['car8']
+    else:
+        option = VEHICLE_OPTIONS['car4']
+
+    # --------------------------------------------------
+    # 2. Shift existing passengers
+    # --------------------------------------------------
+
+    with connection.cursor() as cursor:
+
         for idx in range(len(passenger_ids) - 1, insertion_idx - 1, -1):
             cursor.execute(
-                "UPDATE accounts_riderequest SET dropoff = %s "
-                "WHERE ride_id = %s AND passenger_id = %s",
-                [idx + 1, ride_id, passenger_ids[idx]]
+                """
+                UPDATE accounts_riderequest
+                SET dropoff = %s
+                WHERE ride_id = %s
+                  AND passenger_id = %s
+                  AND dropoff = %s
+                """,
+                [
+                    idx + 1,
+                    ride_id,
+                    passenger_ids[idx],
+                    idx
+                ]
             )
 
-        # Insert the new passenger at the insertion slot
+        # --------------------------------------------------
+        # 3. Insert new passenger
+        # --------------------------------------------------
+
         cursor.execute("""
-                       INSERT INTO accounts_riderequest
-                       (status, date, time, start_location, start_lat, start_lng,
-                        end_location, end_lat, end_lng, estimated_fare,
-                        requested_vehicle_type, requested_capacity,
-                        passenger_id, ride_id, coupon_id, dropoff)
-                       VALUES (%s, CURRENT_DATE, CURRENT_TIME, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NULL,
-                               %s) RETURNING ride_request_id
-                       """, [
-                           new_status, ride_start_location,
-                           ride_start_loc[0], ride_start_loc[1],
-                           data['end_location'], data['end_lat'], data['end_lng'],
-                           new_passenger_fare, 'Car', 4,
-                           user_id, ride_id, insertion_idx
-                       ])
+            INSERT INTO accounts_riderequest
+            (status, date, time, start_location, start_lat, start_lng,
+             end_location, end_lat, end_lng, estimated_fare,
+             requested_vehicle_type, requested_capacity,
+             passenger_id, ride_id, coupon_id, payment_method, dropoff)
+            VALUES (
+                %s, CURRENT_DATE, CURRENT_TIME, %s, %s, %s,
+                %s, %s, %s, 0,
+                %s, %s, %s, %s, NULL, %s, %s
+            )
+            RETURNING ride_request_id
+        """, [
+            new_status,
+            ride_start_location,
+            ride_start_loc[0],
+            ride_start_loc[1],
+            data['end_location'],
+            data['end_lat'],
+            data['end_lng'],
+            vehicle_type,
+            capacity,
+            user_id,
+            ride_id,
+            data['payment_method'],
+            insertion_idx
+        ])
+
         new_request_id = cursor.fetchone()[0]
+
+    # --------------------------------------------------
+    # 4. Get ALL requests in their final route order
+    # --------------------------------------------------
+
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT ride_request_id, end_lat, end_lng
+            FROM accounts_riderequest
+            WHERE ride_id = %s
+              AND status IN ('Pending', 'Accepted')
+            ORDER BY dropoff ASC
+        """, [ride_id])
+
+        requests = cursor.fetchall()
+
+    if not requests:
+        return None
+
+    # --------------------------------------------------
+    # 5. Build final route
+    # --------------------------------------------------
+
+    final_sequence = [
+        ride_start_loc
+    ]
+
+    for request_id, end_lat, end_lng in requests:
+        final_sequence.append((end_lat, end_lng))
+
+    # --------------------------------------------------
+    # 6. Calculate each passenger's actual travel distance
+    # --------------------------------------------------
+
+    passenger_distances = []
+
+    distance_so_far = 0
+
+    for i in range(1, len(final_sequence)):
+
+        d = get_road_dist(
+            final_sequence[i - 1][0],
+            final_sequence[i - 1][1],
+            final_sequence[i][0],
+            final_sequence[i][1]
+        )
+
+        if d is None:
+            return None
+
+        distance_so_far += d
+
+        passenger_distances.append(distance_so_far)
+
+    # --------------------------------------------------
+    # 7. Calculate shared fare pool
+    # --------------------------------------------------
+
+    total_fare = (
+            option['base']
+            + option['per_km'] * new_total_dist
+    )
+
+    shared_fare_pool = total_fare * 1.2
+
+    # --------------------------------------------------
+    # 8. Calculate total passenger distance
+    # --------------------------------------------------
+
+    total_passenger_distance = sum(passenger_distances)
+
+    if total_passenger_distance <= 0:
+        return None
+
+    # --------------------------------------------------
+    # 9. Update EVERY passenger's fare
+    # --------------------------------------------------
+
+    new_passenger_fare = None
+
+    with connection.cursor() as cursor:
+
+        for i, (request_id, _, _) in enumerate(requests):
+
+            passenger_distance = passenger_distances[i]
+
+            fare = round(
+                shared_fare_pool
+                * passenger_distance
+                / total_passenger_distance
+            )
+
+            cursor.execute("""
+                UPDATE accounts_riderequest
+                SET estimated_fare = %s
+                WHERE ride_request_id = %s
+            """, [fare, request_id])
+
+            # Remember the new passenger's fare
+            if request_id == new_request_id:
+                new_passenger_fare = fare
 
     return new_passenger_fare, new_request_id
 
@@ -1668,24 +1961,34 @@ def check_joinable_rides(request):
                 "select count(*) from accounts_riderequest WHERE ride_id = %s",
                 [ride_id]
             )
-            num_passengers = cursor.fetchone()
+            num_passengers = cursor.fetchone()[0]
             cursor.execute(
                 "select requested_capacity from accounts_riderequest WHERE ride_id = %s LIMIT 1",
                 [ride_id]
             )
-            capacity = cursor.fetchone()
+            capacity_row = cursor.fetchone()
+
+            if capacity_row:
+                capacity = capacity_row[0]
+            else:
+                capacity = None
         print("RIDE:", ride_id, "START:", ride_start)
         print("current passenger start:", start_lat, start_lng)
         print("current passenger destinations:", dest_lat, dest_lng)
         if not ride_start:
             continue
 
-        distance = get_road_dist(
+        distance = haversine_km(
             ride_start[0], ride_start[1],
             start_lat, start_lng
         )
 
         if distance is not None and distance <= 0.1 and capacity > num_passengers:
+            print("capacity =", capacity, type(capacity))
+        if (distance is not None
+                and distance <= 0.1
+                and capacity is not None
+                and capacity > num_passengers):
             possible_rides[ride_id] = ride_start
 
         print("DISTANCE:", distance, "km")
@@ -1704,8 +2007,11 @@ def check_joinable_rides(request):
             feasible_rides.append({
                 'ride_id': ride_id,
                 'insertion_index': result[0],
-                'detour_km': round(result[1], 2),
+                'detour_km': round(result[2], 2),
             })
+    print("FINAL FEASIBLE RIDES:", feasible_rides)
+
+    return JsonResponse({'rides': feasible_rides})
 
     return JsonResponse({'rides': feasible_rides})
 
@@ -1732,6 +2038,7 @@ def request_join_ride(request, ride_id):
         dest_lat = float(data['dest_lat'])
         dest_lng = float(data['dest_lng'])
         dest_label = data['end_location']
+        payment_method = data['payment_method']
     except (ValueError, KeyError, TypeError):
         return JsonResponse({'error': 'Missing destination information'}, status=400)
 
@@ -1739,6 +2046,7 @@ def request_join_ride(request, ride_id):
     data['end_lat'] = dest_lat
     data['end_lng'] = dest_lng
     data['end_location'] = dest_label
+    data['payment_method'] = payment_method
 
     with connection.cursor() as cursor:
         cursor.execute(
@@ -1776,3 +2084,53 @@ def request_join_ride(request, ride_id):
     )
 
     return JsonResponse({'success': True, 'your_estimated_fare': fare, 'request_id': new_request_id})
+
+
+def submit_review(request):
+    try:
+        data = json.loads(request.body)
+        ride_id = data.get('ride_id')
+        rating = data.get('rating')
+        comment = data.get('comment', '')
+
+        print("Ride ID:", ride_id);
+        print("Rating:", rating);
+        # Basic validation
+        if not ride_id or not rating:
+            return JsonResponse({'success': False, 'message': 'Ride ID and rating are required.'},
+                                status=400)
+        rating = int(rating)
+        if rating < 1 or rating > 5:
+            return JsonResponse({'success': False, 'message': 'Rating must be between 1 and 5.'},
+                                status=400)
+        passenger_id = request.session.get('user_id')
+        if not passenger_id:
+            return JsonResponse({'success': False, 'message': 'Please log in first.'},
+                                status=401)
+        # Insert review using raw SQL
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """ INSERT INTO accounts_review (rating, comment, passenger_id, ride_id) VALUES (%s, %s, %s, %s) """,
+                [rating, comment, passenger_id, ride_id])
+        return JsonResponse({'success': True, 'message': 'Review submitted successfully.'})
+    except (ValueError, TypeError):
+        return JsonResponse({'success': False, 'message': 'Invalid rating.'}, status=400)
+    except Exception as e:
+        print("Review error:", e)
+
+        if 'You have already reviewed this ride' in str(e):
+            return JsonResponse(
+                {
+                    'success': False,
+                    'message': 'You have already reviewed this ride'
+                },
+                status=400
+            )
+
+        return JsonResponse(
+            {
+                'success': False,
+                'message': 'Failed to submit review.'
+            },
+            status=500
+        )

@@ -38,5 +38,6 @@ urlpatterns = [
 
     path('check-joinable-rides/', views.check_joinable_rides, name='check_joinable_rides'),
     path('request-join-ride/<int:ride_id>/', views.request_join_ride, name='request_join_ride'),
+    path("submit-review/", views.submit_review, name="submit_review")
 ]
 
