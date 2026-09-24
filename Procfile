@@ -1,1 +1,1 @@
-web: gunicorn DjangoProject.wsgi
+web: gunicorn RideShare.wsgi
