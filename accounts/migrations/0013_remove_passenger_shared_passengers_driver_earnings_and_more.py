@@ -11,65 +11,105 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveField(
-            model_name='passenger',
-            name='shared_passengers',
-        ),
-        migrations.AddField(
-            model_name='driver',
-            name='earnings',
-            field=models.DecimalField(decimal_places=2, default=0.0, max_digits=10),
-        ),
-        migrations.AddField(
-            model_name='driver',
-            name='wallet_balance',
-            field=models.DecimalField(decimal_places=2, default=0.0, max_digits=10),
-        ),
-        migrations.AddField(
-            model_name='payment',
-            name='commission_amount',
-            field=models.DecimalField(decimal_places=2, default=0.0, max_digits=10),
-        ),
-        migrations.AddField(
-            model_name='payment',
-            name='driver_amount',
-            field=models.DecimalField(decimal_places=2, default=0.0, max_digits=10),
-        ),
-        migrations.AddField(
-            model_name='payment',
-            name='payment_method',
-            field=models.CharField(default='cash', max_length=20),
-        ),
-        migrations.AddField(
-            model_name='payment',
-            name='payment_type',
-            field=models.CharField(default='ride_fare', max_length=30),
-        ),
-        migrations.AddField(
-            model_name='payment',
-            name='tran_id',
-            field=models.CharField(blank=True, max_length=100, null=True),
-        ),
-        migrations.AddField(
-            model_name='payment',
-            name='val_id',
-            field=models.CharField(blank=True, max_length=100, null=True),
-        ),
-        migrations.AddField(
-            model_name='riderequest',
-            name='payment_method',
-            field=models.CharField(default='cash', max_length=20),
-        ),
-        migrations.CreateModel(
-            name='DriverWalletTransaction',
-            fields=[
-                ('transaction_id', models.AutoField(primary_key=True, serialize=False)),
-                ('amount', models.DecimalField(decimal_places=2, max_digits=10)),
-                ('transaction_type', models.CharField(max_length=30)),
-                ('description', models.CharField(max_length=255)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('driver', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='wallet_transactions', to='accounts.driver')),
-                ('ride', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='wallet_transactions', to='accounts.ride')),
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunSQL(
+                    sql="""
+                        ALTER TABLE accounts_driver ADD COLUMN IF NOT EXISTS earnings numeric(10, 2) DEFAULT 0.00;
+                        ALTER TABLE accounts_driver ADD COLUMN IF NOT EXISTS wallet_balance numeric(10, 2) DEFAULT 0.00;
+                        ALTER TABLE accounts_payment ADD COLUMN IF NOT EXISTS commission_amount numeric(10, 2) DEFAULT 0.00;
+                        ALTER TABLE accounts_payment ADD COLUMN IF NOT EXISTS driver_amount numeric(10, 2) DEFAULT 0.00;
+                        ALTER TABLE accounts_payment ADD COLUMN IF NOT EXISTS payment_method varchar(20) DEFAULT 'cash';
+                        ALTER TABLE accounts_payment ADD COLUMN IF NOT EXISTS payment_type varchar(30) DEFAULT 'ride_fare';
+                        ALTER TABLE accounts_payment ADD COLUMN IF NOT EXISTS tran_id varchar(100);
+                        ALTER TABLE accounts_payment ADD COLUMN IF NOT EXISTS val_id varchar(100);
+                        ALTER TABLE accounts_riderequest ADD COLUMN IF NOT EXISTS payment_method varchar(20) DEFAULT 'cash';
+                        
+                        DO $$
+                        BEGIN
+                            IF EXISTS (
+                                SELECT 1 FROM information_schema.columns 
+                                WHERE table_name = 'accounts_passenger' AND column_name = 'shared_passengers'
+                            ) THEN
+                                ALTER TABLE accounts_passenger DROP COLUMN shared_passengers;
+                            END IF;
+                        END $$;
+
+                        CREATE TABLE IF NOT EXISTS accounts_driverwallettransaction (
+                            transaction_id SERIAL PRIMARY KEY,
+                            amount numeric(10, 2) NOT NULL,
+                            transaction_type varchar(30) NOT NULL,
+                            description varchar(255) NOT NULL,
+                            created_at timestamp with time zone NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            driver_id integer NOT NULL REFERENCES accounts_driver(driver_id) ON DELETE CASCADE,
+                            ride_id integer REFERENCES accounts_ride(ride_id) ON DELETE SET NULL
+                        );
+                    """,
+                    reverse_sql=""
+                )
             ],
-        ),
+            state_operations=[
+                migrations.RemoveField(
+                    model_name='passenger',
+                    name='shared_passengers',
+                ),
+                migrations.AddField(
+                    model_name='driver',
+                    name='earnings',
+                    field=models.DecimalField(decimal_places=2, default=0.0, max_digits=10),
+                ),
+                migrations.AddField(
+                    model_name='driver',
+                    name='wallet_balance',
+                    field=models.DecimalField(decimal_places=2, default=0.0, max_digits=10),
+                ),
+                migrations.AddField(
+                    model_name='payment',
+                    name='commission_amount',
+                    field=models.DecimalField(decimal_places=2, default=0.0, max_digits=10),
+                ),
+                migrations.AddField(
+                    model_name='payment',
+                    name='driver_amount',
+                    field=models.DecimalField(decimal_places=2, default=0.0, max_digits=10),
+                ),
+                migrations.AddField(
+                    model_name='payment',
+                    name='payment_method',
+                    field=models.CharField(default='cash', max_length=20),
+                ),
+                migrations.AddField(
+                    model_name='payment',
+                    name='payment_type',
+                    field=models.CharField(default='ride_fare', max_length=30),
+                ),
+                migrations.AddField(
+                    model_name='payment',
+                    name='tran_id',
+                    field=models.CharField(blank=True, max_length=100, null=True),
+                ),
+                migrations.AddField(
+                    model_name='payment',
+                    name='val_id',
+                    field=models.CharField(blank=True, max_length=100, null=True),
+                ),
+                migrations.AddField(
+                    model_name='riderequest',
+                    name='payment_method',
+                    field=models.CharField(default='cash', max_length=20),
+                ),
+                migrations.CreateModel(
+                    name='DriverWalletTransaction',
+                    fields=[
+                        ('transaction_id', models.AutoField(primary_key=True, serialize=False)),
+                        ('amount', models.DecimalField(decimal_places=2, max_digits=10)),
+                        ('transaction_type', models.CharField(max_length=30)),
+                        ('description', models.CharField(max_length=255)),
+                        ('created_at', models.DateTimeField(auto_now_add=True)),
+                        ('driver', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='wallet_transactions', to='accounts.driver')),
+                        ('ride', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='wallet_transactions', to='accounts.ride')),
+                    ],
+                ),
+            ]
+        )
     ]
