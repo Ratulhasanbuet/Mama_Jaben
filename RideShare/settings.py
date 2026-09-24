@@ -33,9 +33,16 @@ SECRET_KEY = 'django-insecure-(!)zpa+2y*x-q))ypduqo^ymc+484rp-(z&m1@&l@g3mo7_o#h
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
+#
+# # render er domain allow korar jono eta moddhe '*' add korte hoise
+# ALLOWED_HOSTS = ['*']
 
-# render er domain allow korar jono eta moddhe '*' add korte hoise
-ALLOWED_HOSTS = ['*']
+
+ALLOWED_HOSTS = [
+    'mama-jaben.onrender.com',
+    'localhost',
+    '127.0.0.1',
+]
 
 # Application definition
 
