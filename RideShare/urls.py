@@ -18,8 +18,11 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from accounts.views import admin_statistics_view, admin_todays_update_view
 
 urlpatterns = [
-                  path('admin/', admin.site.urls),
-                  path('', include('accounts.urls')),
-              ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    path('admin/statistics/', admin_statistics_view, name='admin_statistics'),
+    path('admin/todays-update/', admin_todays_update_view, name='admin_todays_update'),
+    path('admin/', admin.site.urls),
+    path('', include('accounts.urls')),
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

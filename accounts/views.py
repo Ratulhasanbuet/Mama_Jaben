@@ -16,6 +16,12 @@ from django.views.decorators.csrf import csrf_exempt
 from .sslcommerz import initiate_sslcommerz_payment, validate_sslcommerz_payment
 
 
+from django.contrib import admin
+from django.contrib.admin.views.decorators import staff_member_required
+from django.db.models import Sum, Count, Avg
+from .models import Driver, Passenger, Vehicle, Ride, RideRequest, Payment, Review, Coupon
+
+
 def home(request):
     return render(request, 'mama-jaben-landing.html')
 
@@ -115,12 +121,12 @@ def driver_register(request):
             if license_image:
                 fs = FileSystemStorage()
                 filename = fs.save(license_image.name, license_image)
-                image_path = fs.url(filename)
+                image_path = filename
 
             hashed_password = make_password(password)
 
             cursor.execute(
-                "INSERT INTO accounts_driver (name, phone, email, password, license_no, license_image, joining_date, status) VALUES (%s, %s, %s, %s, %s, %s, CURRENT_DATE, 'Pending')",
+                "INSERT INTO accounts_driver (name, phone, email, password, license_no, license_image, joining_date, status, earnings, wallet_balance) VALUES (%s, %s, %s, %s, %s, %s, CURRENT_DATE, 'Pending', 0.00, 0.00)",
                 [name, phone, email, hashed_password, license_no, image_path]
             )
 
@@ -172,14 +178,20 @@ def passenger_dashboard(request):
                        """, [user_id])
         ride_rows = cursor.fetchall()
 
-        # Coupons that belong to this passenger and haven't expired
+        # Passenger category from PL/pgSQL function
+        cursor.execute("SELECT fn_get_passenger_category(%s)", [user_id])
+        cat_row = cursor.fetchone()
+        passenger_category = cat_row[0] if cat_row else 'NEWBIE'
+
+        # Coupons that belong to this passenger or match their category and haven't expired/used
         cursor.execute("""
-                       SELECT code, discount, expire_date
+                       SELECT code, discount, max_discount, expire_date, category_target
                        FROM accounts_coupon
-                       WHERE passenger_id = %s
+                       WHERE (passenger_id = %s OR (passenger_id IS NULL AND category_target IN ('ALL', %s)))
+                         AND is_used = FALSE
                          AND expire_date >= CURRENT_DATE
                        ORDER BY expire_date ASC
-                       """, [user_id])
+                       """, [user_id, passenger_category])
         coupon_rows = cursor.fetchall()
 
     profile = None
@@ -206,7 +218,13 @@ def passenger_dashboard(request):
     ]
 
     coupons = [
-        {'code': row[0], 'discount': row[1], 'expire_date': row[2]}
+        {
+            'code': row[0],
+            'discount': row[1],
+            'max_discount': row[2],
+            'expire_date': row[3],
+            'category_target': row[4]
+        }
         for row in coupon_rows
     ]
 
@@ -214,6 +232,7 @@ def passenger_dashboard(request):
         'profile': profile,
         'rides': rides,
         'coupons': coupons,
+        'passenger_category': passenger_category,
     }
     return render(request, 'passenger/passenger-dashboard.html', context)
 
@@ -234,22 +253,34 @@ def book_ride(request):
     user_id = request.session.get('user_id')
 
     with connection.cursor() as cursor:
+        cursor.execute("SELECT fn_get_passenger_category(%s)", [user_id])
+        cat_row = cursor.fetchone()
+        passenger_category = cat_row[0] if cat_row else 'NEWBIE'
+
         cursor.execute("""
-                       SELECT code, discount, expire_date
+                       SELECT code, discount, max_discount, expire_date, category_target
                        FROM accounts_coupon
-                       WHERE passenger_id = %s
+                       WHERE (passenger_id = %s OR (passenger_id IS NULL AND category_target IN ('ALL', %s)))
+                         AND is_used = FALSE
                          AND expire_date >= CURRENT_DATE
                        ORDER BY expire_date ASC
-                       """, [user_id])
+                       """, [user_id, passenger_category])
         coupon_rows = cursor.fetchall()
 
     coupons = [
-        {'code': row[0], 'discount': row[1], 'expire_date': row[2]}
+        {
+            'code': row[0],
+            'discount': row[1],
+            'max_discount': row[2],
+            'expire_date': row[3],
+            'category_target': row[4]
+        }
         for row in coupon_rows
     ]
 
     context = {
         'coupons': coupons,
+        'passenger_category': passenger_category,
     }
     return render(request, 'passenger/passenger-booking.html', context)
 
@@ -420,11 +451,20 @@ def confirm_booking(request):
         # A coupon is only honoured if it's really this passenger's and still valid —
         # never trust the vehicle/fare pairing coming from the client alone.
         if coupon_code:
-            cursor.execute(
-                "SELECT 1 FROM accounts_coupon WHERE code = %s AND passenger_id = %s AND expire_date >= CURRENT_DATE",
-                [coupon_code, user_id]
-            )
-            if not cursor.fetchone():
+            cursor.execute("""
+                SELECT 1 FROM accounts_coupon
+                WHERE code = %s
+                  AND (passenger_id = %s OR (passenger_id IS NULL AND category_target IN ('ALL', 'VIP', 'REGULAR', 'NEWBIE')))
+                  AND is_used = FALSE
+                  AND expire_date >= CURRENT_DATE
+            """, [coupon_code, user_id])
+            if cursor.fetchone():
+                cursor.execute("SELECT fn_calculate_coupon_discount(%s, %s)", [coupon_code, float(estimated_fare)])
+                disc_res = cursor.fetchone()
+                if disc_res and disc_res[0] is not None:
+                    discount_val = float(disc_res[0])
+                    estimated_fare = max(0.00, float(estimated_fare) - discount_val)
+            else:
                 coupon_code = None
         # ride also needs this info(modification)
         cursor.execute(
@@ -979,6 +1019,15 @@ def complete_ride(request, ride_id):
             "UPDATE accounts_riderequest SET status = 'Completed' WHERE ride_id = %s",
             [ride_id]
         )
+
+        # Mark single-use coupons as used
+        cursor.execute("""
+            UPDATE accounts_coupon
+            SET is_used = TRUE
+            WHERE code IN (
+                SELECT coupon_id FROM accounts_riderequest WHERE ride_id = %s AND coupon_id IS NOT NULL
+            )
+        """, [ride_id])
 
         # Credit driver cumulative gross earnings
         cursor.execute(
@@ -2134,3 +2183,211 @@ def submit_review(request):
             },
             status=500
         )
+
+
+
+from datetime import date
+
+@staff_member_required
+def admin_statistics_view(request):
+    today = date.today()
+
+    with connection.cursor() as cursor:
+        # Passengers Category Breakdown using PL/pgSQL function
+        cursor.execute("""
+            SELECT 
+                fn_get_passenger_category(user_id) AS category, 
+                COUNT(*) 
+            FROM accounts_passenger 
+            GROUP BY category
+        """)
+        cat_rows = cursor.fetchall()
+        category_counts = {row[0]: row[1] for row in cat_rows}
+
+        # Daily / Recent Ride Trends
+        cursor.execute("""
+            SELECT 
+                TO_CHAR(date, 'YYYY-MM-DD') AS ride_date, 
+                COUNT(*) AS total_rides,
+                COALESCE(SUM(estimated_fare), 0) AS total_fare
+            FROM accounts_riderequest
+            GROUP BY ride_date
+            ORDER BY ride_date DESC
+            LIMIT 15
+        """)
+        trend_rows = cursor.fetchall()
+        trend_rows.reverse()
+
+    # Today's Specific Metrics
+    today_requests_count = RideRequest.objects.filter(date=today).count()
+    today_accepted_count = RideRequest.objects.filter(date=today, status__in=['Accepted', 'Completed']).count()
+    today_pending_count = RideRequest.objects.filter(date=today, status='Pending').count()
+    today_rejected_count = RideRequest.objects.filter(date=today, status='Rejected').count()
+    
+    today_trans_agg = Payment.objects.filter(ride__requests__date=today, status='Paid').aggregate(
+        total=Sum('amount'),
+        commission=Sum('commission_amount')
+    )
+    today_transaction_total = float(today_trans_agg['total'] or 0)
+    today_commission_total = float(today_trans_agg['commission'] or 0)
+    if today_transaction_total == 0:
+        today_fare_agg = RideRequest.objects.filter(date=today, status__in=['Accepted', 'Completed']).aggregate(
+            total=Sum('estimated_fare')
+        )
+        today_transaction_total = float(today_fare_agg['total'] or 0)
+        today_commission_total = round(today_transaction_total * 0.15, 2)
+
+    today_drivers_count = Driver.objects.filter(joining_date=today).count()
+
+    # Core Overall Metrics
+    total_drivers = Driver.objects.count()
+    approved_drivers = Driver.objects.filter(status='Approved').count()
+    pending_drivers = Driver.objects.filter(status='Pending').count()
+
+    total_passengers = Passenger.objects.count()
+    vip_passengers = category_counts.get('VIP', 0)
+    regular_passengers = category_counts.get('REGULAR', 0)
+    newbie_passengers = category_counts.get('NEWBIE', 0)
+
+    total_vehicles = Vehicle.objects.count()
+    vehicles_by_type = list(Vehicle.objects.values('type').annotate(count=Count('vehicle_id')))
+
+    total_ride_requests = RideRequest.objects.count()
+    completed_rides = RideRequest.objects.filter(status__in=['Accepted', 'Completed']).count()
+    pending_rides = RideRequest.objects.filter(status='Pending').count()
+    rejected_rides = RideRequest.objects.filter(status='Rejected').count()
+
+    total_revenue_agg = Payment.objects.filter(status='Paid').aggregate(
+        total_fare=Sum('amount'),
+        total_commission=Sum('commission_amount'),
+        total_driver=Sum('driver_amount')
+    )
+    total_fare = float(total_revenue_agg['total_fare'] or 0)
+    total_commission = float(total_revenue_agg['total_commission'] or 0)
+    total_driver_payout = float(total_revenue_agg['total_driver'] or 0)
+
+    payment_method_stats = list(Payment.objects.values('payment_method').annotate(
+        count=Count('payment_id'), 
+        total=Sum('amount')
+    ))
+    for pm in payment_method_stats:
+        pm['total'] = float(pm['total'] or 0)
+
+    avg_rating_agg = Review.objects.aggregate(avg_rating=Avg('rating'), count=Count('review_id'))
+    avg_rating = round(avg_rating_agg['avg_rating'] or 0, 1)
+    total_reviews = avg_rating_agg['count'] or 0
+
+    top_drivers = Driver.objects.order_by('-earnings')[:5]
+
+    active_coupons = Coupon.objects.filter(is_used=False).count()
+    used_coupons = Coupon.objects.filter(is_used=True).count()
+
+    # JSON Serialized for Chart.js
+    trend_dates = [r[0] for r in trend_rows]
+    trend_rides = [r[1] for r in trend_rows]
+    trend_fares = [float(r[2]) for r in trend_rows]
+
+    vehicle_labels = [v['type'] for v in vehicles_by_type]
+    vehicle_data = [v['count'] for v in vehicles_by_type]
+
+    cat_labels = ['VIP Passengers', 'Regular Passengers', 'Newbie Passengers']
+    cat_data = [vip_passengers, regular_passengers, newbie_passengers]
+
+    pm_labels = [p['payment_method'].upper() for p in payment_method_stats]
+    pm_data = [p['count'] for p in payment_method_stats]
+
+    context = dict(
+        admin.site.each_context(request),
+        title="📊 System Statistics & Analytics",
+        today=today,
+        today_requests_count=today_requests_count,
+        today_accepted_count=today_accepted_count,
+        today_pending_count=today_pending_count,
+        today_rejected_count=today_rejected_count,
+        today_transaction_total=today_transaction_total,
+        today_commission_total=today_commission_total,
+        today_drivers_count=today_drivers_count,
+
+        total_drivers=total_drivers,
+        approved_drivers=approved_drivers,
+        pending_drivers=pending_drivers,
+        total_passengers=total_passengers,
+        vip_passengers=vip_passengers,
+        regular_passengers=regular_passengers,
+        newbie_passengers=newbie_passengers,
+        total_vehicles=total_vehicles,
+        total_ride_requests=total_ride_requests,
+        completed_rides=completed_rides,
+        pending_rides=pending_rides,
+        rejected_rides=rejected_rides,
+        total_fare=total_fare,
+        total_commission=total_commission,
+        total_driver_payout=total_driver_payout,
+        payment_method_stats=payment_method_stats,
+        avg_rating=avg_rating,
+        total_reviews=total_reviews,
+        top_drivers=top_drivers,
+        active_coupons=active_coupons,
+        used_coupons=used_coupons,
+
+        trend_dates_json=json.dumps(trend_dates),
+        trend_rides_json=json.dumps(trend_rides),
+        trend_fares_json=json.dumps(trend_fares),
+        vehicle_labels_json=json.dumps(vehicle_labels),
+        vehicle_data_json=json.dumps(vehicle_data),
+        cat_labels_json=json.dumps(cat_labels),
+        cat_data_json=json.dumps(cat_data),
+        pm_labels_json=json.dumps(pm_labels),
+        pm_data_json=json.dumps(pm_data),
+    )
+    return render(request, 'admin/statistics.html', context)
+
+
+@staff_member_required
+def admin_todays_update_view(request):
+    today = date.today()
+
+    today_requests_count = RideRequest.objects.filter(date=today).count()
+    today_accepted_count = RideRequest.objects.filter(date=today, status__in=['Accepted', 'Completed']).count()
+    today_pending_count = RideRequest.objects.filter(date=today, status='Pending').count()
+    today_rejected_count = RideRequest.objects.filter(date=today, status='Rejected').count()
+
+    today_trans_agg = Payment.objects.filter(ride__requests__date=today, status='Paid').aggregate(
+        total=Sum('amount'),
+        commission=Sum('commission_amount')
+    )
+    today_transaction_total = float(today_trans_agg['total'] or 0)
+    today_commission_total = float(today_trans_agg['commission'] or 0)
+
+    if today_transaction_total == 0:
+        today_fare_agg = RideRequest.objects.filter(date=today, status__in=['Accepted', 'Completed']).aggregate(
+            total=Sum('estimated_fare')
+        )
+        today_transaction_total = float(today_fare_agg['total'] or 0)
+        today_commission_total = round(today_transaction_total * 0.15, 2)
+
+    today_drivers_count = Driver.objects.filter(joining_date=today).count()
+
+    today_rides_qs = RideRequest.objects.filter(date=today).select_related('passenger', 'ride__driver').order_by('-time')
+    today_rides_list = list(today_rides_qs)
+    
+    is_historical_feed = False
+    if not today_rides_list:
+        today_rides_list = list(RideRequest.objects.select_related('passenger', 'ride__driver').order_by('-date', '-time')[:15])
+        is_historical_feed = True
+
+    context = dict(
+        admin.site.each_context(request),
+        title="📅 Today's Live Update & Statistics",
+        today=today,
+        today_requests_count=today_requests_count,
+        today_accepted_count=today_accepted_count,
+        today_pending_count=today_pending_count,
+        today_rejected_count=today_rejected_count,
+        today_transaction_total=today_transaction_total,
+        today_commission_total=today_commission_total,
+        today_drivers_count=today_drivers_count,
+        today_rides_list=today_rides_list,
+        is_historical_feed=is_historical_feed,
+    )
+    return render(request, 'admin/todays_update.html', context)

@@ -12,11 +12,11 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 
-
 import os
 from dotenv import load_dotenv
 
-
+# local computer er sob host user password alada alada jaigai thake .. but render er moto cloud service e sob gula jinis ekta link e configure korar jonno ei library ta use hoise which is a standard practice
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -34,8 +34,8 @@ SECRET_KEY = 'django-insecure-(!)zpa+2y*x-q))ypduqo^ymc+484rp-(z&m1@&l@g3mo7_o#h
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+# render er domain allow korar jono eta moddhe '*' add korte hoise
+ALLOWED_HOSTS = ['*']
 
 # Application definition
 
@@ -53,6 +53,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    #production e static file serve korar jono ei middleware ta use kora hoy .. karno gunicorn direct static file handle korte pare na .. gunicorn mainly dynamic content handle kore
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -81,23 +83,35 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'RideShare.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 load_dotenv()
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'postgres',
-        'USER': os.getenv('POSTGRES_USER'),
-        'PASSWORD': os.getenv('POSTGRES_PASSWORD'),
-        'HOST': 'aws-0-ap-southeast-1.pooler.supabase.com',
-        'PORT': '5432',
-    }
-}
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'postgres',
+#         'USER': os.getenv('POSTGRES_USER'),
+#         'PASSWORD': os.getenv('POSTGRES_PASSWORD'),
+#         'HOST': 'aws-0-ap-southeast-1.pooler.supabase.com',
+#         'PORT': '5432',
+#     }
+# }
 
+
+#conn_max_age mean kore ekbar database connection create hoile then eta koto somoi dhore tike thakbe .. naile proti request e bar bar connection create kora and off kore dewa inefficient
+
+#conn_health_checks hoile database connection er health check kore
+
+
+DATABASES = {
+    'default': dj_database_url.config(
+        default=f"postgres://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres",
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
@@ -117,7 +131,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
@@ -129,19 +142,16 @@ USE_I18N = True
 
 USE_TZ = True
 
-
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
-
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 import os
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-
-
 
 load_dotenv()
 

@@ -1,0 +1,267 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}Today's Live Update & Statistics | Django Admin{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Home</a> &rsaquo; 
+    <a href="{% url 'admin_statistics' %}">Statistics</a> &rsaquo; 
+    Today's Live Update
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+    .todays-container {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: #1e293b;
+        margin-top: 15px;
+    }
+
+    .todays-header {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        color: #ffffff;
+        padding: 24px 28px;
+        border-radius: 14px;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .todays-header h1 {
+        font-size: 24px;
+        font-weight: 800;
+        margin: 0;
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .date-pill {
+        background: rgba(255,255,255,0.15);
+        color: #38bdf8;
+        border: 1px solid rgba(56, 189, 248, 0.3);
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    /* KPI Cards */
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 18px;
+        margin-bottom: 28px;
+    }
+
+    .kpi-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+
+    .kpi-title {
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #64748b;
+        margin-bottom: 8px;
+    }
+
+    .kpi-value {
+        font-size: 28px;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1.2;
+    }
+
+    .kpi-subtext {
+        font-size: 12px;
+        color: #64748b;
+        margin-top: 6px;
+    }
+
+    /* Table Container */
+    .feed-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 24px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+
+    .feed-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+    }
+
+    .feed-header h3 {
+        font-size: 18px;
+        font-weight: 700;
+        margin: 0;
+        color: #0f172a;
+    }
+
+    .custom-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+
+    .custom-table th {
+        background: #f8fafc;
+        text-align: left;
+        padding: 12px 14px;
+        font-weight: 700;
+        color: #475569;
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    .custom-table td {
+        padding: 12px 14px;
+        border-bottom: 1px solid #f1f5f9;
+        color: #1e293b;
+    }
+
+    .badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 700;
+        display: inline-block;
+    }
+
+    .badge-success { background: #d1e7dd; color: #0f5132; }
+    .badge-warning { background: #fff3cd; color: #664d03; }
+    .badge-danger { background: #f8d7da; color: #842029; }
+    .badge-info { background: #cff4fc; color: #055160; }
+</style>
+
+<div class="todays-container">
+    <div class="todays-header">
+        <div>
+            <h1>📅 Today's Live Update</h1>
+            <p style="margin: 6px 0 0 0; color: #94a3b8; font-size: 13px;">Real-time stats for ride requests, accepted rides, transaction volume & activity today.</p>
+        </div>
+        <div class="date-pill">Today: {{ today|date:"F j, Y" }}</div>
+    </div>
+
+    <!-- Today's Top KPI Grid -->
+    <div class="kpi-grid">
+        <div class="kpi-card" style="border-top: 4px solid #3b82f6;">
+            <div class="kpi-title">Today's Ride Requests</div>
+            <div class="kpi-value">{{ today_requests_count }}</div>
+            <div class="kpi-subtext">Total requests placed today</div>
+        </div>
+
+        <div class="kpi-card" style="border-top: 4px solid #10b981;">
+            <div class="kpi-title">Today's Accepted Rides</div>
+            <div class="kpi-value" style="color: #10b981;">{{ today_accepted_count }}</div>
+            <div class="kpi-subtext">
+                <span style="color: #f59e0b;">⏳ {{ today_pending_count }} Pending</span> | 
+                <span style="color: #ef4444;">✖ {{ today_rejected_count }} Rejected</span>
+            </div>
+        </div>
+
+        <div class="kpi-card" style="border-top: 4px solid #8b5cf6;">
+            <div class="kpi-title">Today's Transaction Volume</div>
+            <div class="kpi-value" style="color: #8b5cf6;">৳{{ today_transaction_total|floatformat:2 }}</div>
+            <div class="kpi-subtext">Total trip fare volume today</div>
+        </div>
+
+        <div class="kpi-card" style="border-top: 4px solid #f59e0b;">
+            <div class="kpi-title">Today's Commission</div>
+            <div class="kpi-value" style="color: #f59e0b;">৳{{ today_commission_total|floatformat:2 }}</div>
+            <div class="kpi-subtext">Platform revenue cut today</div>
+        </div>
+
+        <div class="kpi-card" style="border-top: 4px solid #06b6d4;">
+            <div class="kpi-title">New Drivers Joined Today</div>
+            <div class="kpi-value">{{ today_drivers_count }}</div>
+            <div class="kpi-subtext">Newly registered drivers</div>
+        </div>
+    </div>
+
+    <!-- Today's Activity Table -->
+    <div class="feed-card">
+        <div class="feed-header">
+            <h3>
+                {% if is_historical_feed %}
+                    📋 Recent Ride Requests Feed (Showing Recent Requests)
+                {% else %}
+                    📋 Today's Ride Request Activity Feed
+                {% endif %}
+            </h3>
+            <a href="{% url 'admin_statistics' %}" class="button" style="padding: 6px 14px; font-size: 12px;">📊 View All-Time Statistics Dashboard &rarr;</a>
+        </div>
+
+        {% if is_historical_feed %}
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px;">
+            ℹ️ No new ride requests placed yet for today's date ({{ today|date:"Y-m-d" }}). Showing the most recent ride activity feed below for system verification.
+        </div>
+        {% endif %}
+
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Req #</th>
+                    <th>Passenger</th>
+                    <th>Pickup & Destination</th>
+                    <th>Vehicle Type</th>
+                    <th>Fare (BDT)</th>
+                    <th>Date & Time</th>
+                    <th>Driver Assigned</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for req in today_rides_list %}
+                <tr>
+                    <td><strong>#{{ req.ride_request_id }}</strong></td>
+                    <td>{{ req.passenger.name }}</td>
+                    <td>
+                        <div><strong>From:</strong> {{ req.start_location }}</div>
+                        <div style="color: #64748b; margin-top: 2px;"><strong>To:</strong> {{ req.end_location }}</div>
+                    </td>
+                    <td><span class="badge badge-info">{{ req.requested_vehicle_type|capfirst }}</span></td>
+                    <td style="font-weight: 700; color: #10b981;">৳{{ req.estimated_fare }}</td>
+                    <td>{{ req.date }} <br><span style="font-size: 11px; color: #64748b;">{{ req.time }}</span></td>
+                    <td>
+                        {% if req.ride and req.ride.driver %}
+                            {{ req.ride.driver.name }}
+                        {% else %}
+                            <span style="color: #94a3b8;">Not assigned</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if req.status == 'Accepted' or req.status == 'Completed' %}
+                            <span class="badge badge-success">Accepted / Active</span>
+                        {% elif req.status == 'Pending' %}
+                            <span class="badge badge-warning">Pending</span>
+                        {% else %}
+                            <span class="badge badge-danger">{{ req.status }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" style="text-align: center; color: #64748b; padding: 20px;">No ride activity available yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

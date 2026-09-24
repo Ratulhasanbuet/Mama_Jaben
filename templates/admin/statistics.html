@@ -1,0 +1,502 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}System Statistics & Analytics | Django Admin{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">Home</a> &rsaquo; System Statistics & Analytics
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --stat-bg: #f8fafc;
+        --stat-card-bg: #ffffff;
+        --stat-border: #e2e8f0;
+        --stat-text: #1e293b;
+        --stat-text-muted: #64748b;
+        --stat-primary: #3b82f6;
+        --stat-success: #10b981;
+        --stat-warning: #f59e0b;
+        --stat-danger: #ef4444;
+        --stat-purple: #8b5cf6;
+    }
+
+    .analytics-container {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: var(--stat-text);
+        margin-top: 15px;
+    }
+
+    .dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+        padding-bottom: 16px;
+        border-bottom: 2px solid var(--stat-border);
+    }
+
+    .dashboard-header h1 {
+        font-size: 24px;
+        font-weight: 700;
+        margin: 0;
+        color: var(--stat-text);
+    }
+
+    .header-badge {
+        background: #eff6ff;
+        color: var(--stat-primary);
+        border: 1px solid #bfdbfe;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    /* KPI Cards Grid */
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 18px;
+        margin-bottom: 28px;
+    }
+
+    .kpi-card {
+        background: var(--stat-card-bg);
+        border: 1px solid var(--stat-border);
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .kpi-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    }
+
+    .kpi-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+
+    .kpi-title {
+        font-size: 13px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--stat-text-muted);
+    }
+
+    .kpi-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+    }
+
+    .kpi-value {
+        font-size: 26px;
+        font-weight: 800;
+        line-height: 1.2;
+        color: var(--stat-text);
+    }
+
+    .kpi-subtext {
+        font-size: 12px;
+        color: var(--stat-text-muted);
+        margin-top: 6px;
+    }
+
+    /* Charts Grid */
+    .charts-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+        gap: 22px;
+        margin-bottom: 28px;
+    }
+
+    .chart-card {
+        background: var(--stat-card-bg);
+        border: 1px solid var(--stat-border);
+        border-radius: 12px;
+        padding: 22px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+
+    .chart-card h3 {
+        font-size: 16px;
+        font-weight: 700;
+        margin-top: 0;
+        margin-bottom: 18px;
+        color: var(--stat-text);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .chart-container {
+        position: relative;
+        height: 280px;
+        width: 100%;
+    }
+
+    /* Tables Grid */
+    .tables-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 22px;
+    }
+
+    .table-card {
+        background: var(--stat-card-bg);
+        border: 1px solid var(--stat-border);
+        border-radius: 12px;
+        padding: 22px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+
+    .table-card h3 {
+        font-size: 16px;
+        font-weight: 700;
+        margin-top: 0;
+        margin-bottom: 16px;
+        color: var(--stat-text);
+    }
+
+    .custom-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }
+
+    .custom-table th {
+        background: #f8fafc;
+        text-align: left;
+        padding: 10px 12px;
+        font-weight: 600;
+        color: var(--stat-text-muted);
+        border-bottom: 2px solid var(--stat-border);
+    }
+
+    .custom-table td {
+        padding: 12px;
+        border-bottom: 1px solid #f1f5f9;
+        color: var(--stat-text);
+    }
+
+    .badge {
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .badge-success { background: #d1e7dd; color: #0f5132; }
+    .badge-warning { background: #fff3cd; color: #664d03; }
+    .badge-danger { background: #f8d7da; color: #842029; }
+    .badge-info { background: #cff4fc; color: #055160; }
+</style>
+
+<!-- Load Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<div class="analytics-container">
+    <div class="dashboard-header">
+        <div>
+            <h1>📊 Mama Jaben Analytics & Statistics</h1>
+            <p style="margin: 4px 0 0 0; color: var(--stat-text-muted); font-size: 13px;">Real-time system performance, financial revenue, ride statistics & user insights.</p>
+        </div>
+        <a href="{% url 'admin_todays_update' %}" class="button" style="background: #10b981; color: #fff; padding: 8px 16px; border-radius: 8px; font-weight: 700; text-decoration: none; border: none;">
+            📅 View Today's Live Update &rarr;
+        </a>
+    </div>
+
+    <!-- Today's Live Summary Card Banner -->
+    <div style="background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%); border: 1px solid #a7f3d0; border-radius: 12px; padding: 18px 22px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+            <div style="font-size: 30px;">📅</div>
+            <div>
+                <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #065f46;">Today's Live Snapshot ({{ today|date:"F j, Y" }})</h3>
+                <p style="margin: 3px 0 0 0; font-size: 13px; color: #047857;">
+                    Requests Today: <strong>{{ today_requests_count }}</strong> | 
+                    Accepted Today: <strong style="color: #10b981;">{{ today_accepted_count }}</strong> | 
+                    Transaction Vol: <strong>৳{{ today_transaction_total|floatformat:2 }}</strong>
+                </p>
+            </div>
+        </div>
+        <a href="{% url 'admin_todays_update' %}" style="color: #047857; font-weight: 700; font-size: 13px; text-decoration: underline;">Open Detailed Today Feed &rarr;</a>
+    </div>
+
+    <!-- KPI Metric Cards -->
+    <div class="kpi-grid">
+        <div class="kpi-card" style="border-top: 4px solid var(--stat-primary);">
+            <div class="kpi-header">
+                <span class="kpi-title">Total Revenue</span>
+                <div class="kpi-icon" style="background: #eff6ff; color: var(--stat-primary);">৳</div>
+            </div>
+            <div class="kpi-value">৳{{ total_fare|floatformat:2 }}</div>
+            <div class="kpi-subtext">
+                Platform Commission: <strong>৳{{ total_commission|floatformat:2 }}</strong> | Payout: ৳{{ total_driver_payout|floatformat:2 }}
+            </div>
+        </div>
+
+        <div class="kpi-card" style="border-top: 4px solid var(--stat-success);">
+            <div class="kpi-header">
+                <span class="kpi-title">Total Rides</span>
+                <div class="kpi-icon" style="background: #ecfdf5; color: var(--stat-success);">🚕</div>
+            </div>
+            <div class="kpi-value">{{ total_ride_requests }}</div>
+            <div class="kpi-subtext">
+                <span style="color: var(--stat-success);">✔ {{ completed_rides }} Accepted</span> | 
+                <span style="color: var(--stat-warning);">⏳ {{ pending_rides }} Pending</span>
+            </div>
+        </div>
+
+        <div class="kpi-card" style="border-top: 4px solid var(--stat-purple);">
+            <div class="kpi-header">
+                <span class="kpi-title">Registered Drivers</span>
+                <div class="kpi-icon" style="background: #f5f3ff; color: var(--stat-purple);">👨‍✈️</div>
+            </div>
+            <div class="kpi-value">{{ total_drivers }}</div>
+            <div class="kpi-subtext">
+                <span style="color: var(--stat-success);">{{ approved_drivers }} Approved</span> | 
+                <span style="color: var(--stat-warning);">{{ pending_drivers }} Pending Verification</span>
+            </div>
+        </div>
+
+        <div class="kpi-card" style="border-top: 4px solid var(--stat-warning);">
+            <div class="kpi-header">
+                <span class="kpi-title">Passengers & Vehicles</span>
+                <div class="kpi-icon" style="background: #fffbeb; color: var(--stat-warning);">👥</div>
+            </div>
+            <div class="kpi-value">{{ total_passengers }} <span style="font-size: 15px; font-weight: normal; color: var(--stat-text-muted);">Users</span></div>
+            <div class="kpi-subtext">
+                <strong>{{ total_vehicles }} Vehicles</strong> registered in fleet
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Grid -->
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h3>📈 Daily Ride & Revenue Trend</h3>
+            <div class="chart-container">
+                <canvas id="rideTrendChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <h3>🚗 Vehicle Types Distribution</h3>
+            <div class="chart-container">
+                <canvas id="vehicleTypeChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <h3>🌟 Passenger Categories Breakdown</h3>
+            <div class="chart-container">
+                <canvas id="passengerCatChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <h3>💳 Payment Method Ratio</h3>
+            <div class="chart-container">
+                <canvas id="paymentMethodChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Tables Grid -->
+    <div class="tables-grid">
+        <div class="table-card">
+            <h3>🏆 Top Performing Drivers</h3>
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>Driver Name</th>
+                        <th>Phone</th>
+                        <th>Status</th>
+                        <th style="text-align: right;">Total Earnings</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for driver in top_drivers %}
+                    <tr>
+                        <td><strong>{{ driver.name }}</strong></td>
+                        <td>{{ driver.phone }}</td>
+                        <td>
+                            {% if driver.status == 'Approved' %}
+                                <span class="badge badge-success">Approved</span>
+                            {% else %}
+                                <span class="badge badge-warning">{{ driver.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: 700; color: var(--stat-success);">৳{{ driver.earnings }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" style="text-align: center; color: var(--stat-text-muted);">No drivers registered yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="table-card">
+            <h3>⭐ Platform Review & Promo Summary</h3>
+            <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                <div style="flex: 1; background: #fafafa; padding: 15px; border-radius: 10px; border: 1px solid #f0f0f0; text-align: center;">
+                    <div style="font-size: 28px; font-weight: 800; color: #f59e0b;">⭐ {{ avg_rating }} / 5</div>
+                    <div style="font-size: 12px; color: var(--stat-text-muted); margin-top: 4px;">Based on {{ total_reviews }} passenger reviews</div>
+                </div>
+                <div style="flex: 1; background: #fafafa; padding: 15px; border-radius: 10px; border: 1px solid #f0f0f0; text-align: center;">
+                    <div style="font-size: 28px; font-weight: 800; color: var(--stat-primary);">🎟️ {{ active_coupons }}</div>
+                    <div style="font-size: 12px; color: var(--stat-text-muted); margin-top: 4px;">Active Coupons | {{ used_coupons }} Used</div>
+                </div>
+            </div>
+
+            <h4>Quick Action Shortcuts:</h4>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <a href="{% url 'admin:accounts_driver_changelist' %}" class="button" style="padding: 6px 14px; font-size: 12px;">Manage Drivers</a>
+                <a href="{% url 'admin:accounts_vehicle_changelist' %}" class="button" style="padding: 6px 14px; font-size: 12px;">Manage Vehicles</a>
+                <a href="{% url 'admin:accounts_riderequest_changelist' %}" class="button" style="padding: 6px 14px; font-size: 12px;">Ride Requests</a>
+                <a href="{% url 'admin:accounts_payment_changelist' %}" class="button" style="padding: 6px 14px; font-size: 12px;">Payment Records</a>
+                <a href="{% url 'admin:accounts_coupon_changelist' %}" class="button" style="padding: 6px 14px; font-size: 12px;">Promos & Coupons</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Chart 1: Daily Ride Trend (Line / Bar)
+        const trendDates = {{ trend_dates_json|safe }};
+        const trendRides = {{ trend_rides_json|safe }};
+        const trendFares = {{ trend_fares_json|safe }};
+
+        new Chart(document.getElementById('rideTrendChart'), {
+            type: 'bar',
+            data: {
+                labels: trendDates.length ? trendDates : ['No Data'],
+                datasets: [
+                    {
+                        label: 'Total Rides',
+                        data: trendRides.length ? trendRides : [0],
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderColor: '#3b82f6',
+                        borderWidth: 1,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Revenue (৳)',
+                        data: trendFares.length ? trendFares : [0],
+                        type: 'line',
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        position: 'left',
+                        title: { display: true, text: 'Rides Count' }
+                    },
+                    y1: {
+                        beginAtZero: true,
+                        position: 'right',
+                        grid: { drawOnChartArea: false },
+                        title: { display: true, text: 'Revenue (৳)' }
+                    }
+                }
+            }
+        });
+
+        // Chart 2: Vehicle Types (Doughnut)
+        const vehicleLabels = {{ vehicle_labels_json|safe }};
+        const vehicleData = {{ vehicle_data_json|safe }};
+
+        new Chart(document.getElementById('vehicleTypeChart'), {
+            type: 'doughnut',
+            data: {
+                labels: vehicleLabels.length ? vehicleLabels : ['None'],
+                datasets: [{
+                    data: vehicleData.length ? vehicleData : [0],
+                    backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right' }
+                }
+            }
+        });
+
+        // Chart 3: Passenger Categories (Pie)
+        const catLabels = {{ cat_labels_json|safe }};
+        const catData = {{ cat_data_json|safe }};
+
+        new Chart(document.getElementById('passengerCatChart'), {
+            type: 'pie',
+            data: {
+                labels: catLabels,
+                datasets: [{
+                    data: catData,
+                    backgroundColor: ['#ef4444', '#0284c7', '#10b981']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right' }
+                }
+            }
+        });
+
+        // Chart 4: Payment Methods (Bar)
+        const pmLabels = {{ pm_labels_json|safe }};
+        const pmData = {{ pm_data_json|safe }};
+
+        new Chart(document.getElementById('paymentMethodChart'), {
+            type: 'bar',
+            data: {
+                labels: pmLabels.length ? pmLabels : ['CASH', 'ONLINE'],
+                datasets: [{
+                    label: 'Transaction Count',
+                    data: pmData.length ? pmData : [0, 0],
+                    backgroundColor: ['#10b981', '#6366f1']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

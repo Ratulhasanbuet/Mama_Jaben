@@ -9,29 +9,33 @@ class Migration(migrations.Migration):
         ('accounts', '0008_merge_20260916_0932'),
     ]
 
-    operations = [
+    review_ = [
         migrations.RunSQL(
             sql="""
-                    CREATE OR REPLACE FUNCTION check_duplicate_review()
+                CREATE
+                OR REPLACE FUNCTION check_duplicate_review()
                     RETURNS TRIGGER
                     AS $$
-                    Begin
-                    if exists(
+                Begin
+                    if
+                exists(
                     select 1 from accounts_review
                     where passenger_id= new.passenger_id
                     and ride_id = new.ride_id
                     ) then
                     RAISE EXCEPTION 'You have already reviewed this ride';
-                    end if;
-                    return new;
-                    end;
-                    $$ LANGUAGE plpgsql;
+                end if;
+                return new;
+                end;
+                    $$
+                LANGUAGE plpgsql;
 
-                CREATE Or replace TRIGGER prevent_duplicate_review
+                CREATE
+                Or replace TRIGGER prevent_duplicate_review
                 BEFORE INSERT ON accounts_review
                 FOR EACH ROW
                 EXECUTE FUNCTION check_duplicate_review();
-            """,
+                """,
             reverse_sql="""
                 DROP TRIGGER IF EXISTS prevent_duplicate_review
                 ON accounts_review;
@@ -39,5 +43,6 @@ class Migration(migrations.Migration):
                 DROP FUNCTION IF EXISTS check_duplicate_review();
             """
         ),
-                    
+
     ]
+    operations = review_

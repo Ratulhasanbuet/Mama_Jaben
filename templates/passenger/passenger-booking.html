@@ -178,9 +178,8 @@
                     class="mt-2 w-full sm:w-72 border border-hairline rounded-lg px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-ring">
                 <option value="">No coupon</option>
                 {% for coupon in coupons %}
-                <option value="{{ coupon.code }}" data-discount="{{ coupon.discount }}">{{ coupon.code }} — {{
-                    coupon.discount
-                    }}% OFF
+                <option value="{{ coupon.code }}" data-discount="{{ coupon.discount }}" data-max-discount="{{ coupon.max_discount }}">
+                    {{ coupon.code }} — {{ coupon.discount }}% OFF{% if coupon.max_discount > 0 %} (Max ৳{{ coupon.max_discount }}){% endif %}
                 </option>
                 {% endfor %}
             </select>
@@ -540,10 +539,13 @@
         });
     });
 
+    let appliedMaxDiscount = 0;
+
     function applyCoupon() {
         const select = document.getElementById("coupon-select");
         const opt = select.options[select.selectedIndex];
         appliedDiscount = opt.value ? parseFloat(opt.dataset.discount) : 0;
+        appliedMaxDiscount = opt.value ? parseFloat(opt.dataset.maxDiscount || 0) : 0;
         document.getElementById("field-coupon-code").value = opt.value || "";
         updateTotal();
     }
@@ -552,7 +554,14 @@
         if (!selectedVehicle) return;
 
         const base = vehicleFares[selectedVehicle];
-        const total = appliedDiscount ? base * (1 - appliedDiscount / 100) : base;
+        let disc = 0;
+        if (appliedDiscount) {
+            disc = (base * appliedDiscount) / 100;
+            if (appliedMaxDiscount > 0 && disc > appliedMaxDiscount) {
+                disc = appliedMaxDiscount;
+            }
+        }
+        const total = Math.max(0, base - disc);
 
         document.getElementById("final-fare").textContent = "৳" + Math.round(total);
 

@@ -58,15 +58,34 @@ class Vehicle(models.Model):
 # 4. COUPON TABLE (Relationship: "Gets" with Passenger)
 # ==========================================
 class Coupon(models.Model):
+    CATEGORY_CHOICES = [
+        ('ALL', 'All Passengers'),
+        ('VIP', 'VIP Passengers'),
+        ('REGULAR', 'Regular Passengers'),
+        ('NEWBIE', 'Newbie Passengers'),
+    ]
+
     code = models.CharField(max_length=30, primary_key=True)  # Primary Key 'code'
     expire_date = models.DateField()
-    discount = models.DecimalField(max_digits=5, decimal_places=2)  # Discount percentage/amount
+    discount = models.DecimalField(max_digits=5, decimal_places=2, help_text="Discount percentage (e.g. 20.00 for 20%)")
+    max_discount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, help_text="Max discount limit in BDT (0 for no cap)")
+    category_target = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='ALL')
+    is_used = models.BooleanField(default=False)
+    created_at = models.DateField(auto_now_add=True, null=True, blank=True)
 
     # "Gets" Relationship -> Passenger
     passenger = models.ForeignKey(Passenger, on_delete=models.SET_NULL, null=True, blank=True, related_name='coupons')
 
+    def calculate_discount_amount(self, fare_amount):
+        """Calculates discount amount in BDT based on percentage and max cap."""
+        discount_val = (fare_amount * self.discount) / 100
+        if self.max_discount > 0 and discount_val > self.max_discount:
+            return self.max_discount
+        return discount_val
+
     def __str__(self):
-        return f"Coupon: {self.code} ({self.discount}% OFF)"
+        cap_str = f" (Max ৳{self.max_discount})" if self.max_discount > 0 else ""
+        return f"Coupon: {self.code} ({self.discount}% OFF{cap_str})"
 
 
 # ==========================================

@@ -395,7 +395,16 @@
                         {{ profile.name|slice:":1"|upper }}
                     </div>
                     <div class="min-w-0">
-                        <p class="font-display font-bold text-ink truncate">{{ profile.name }}</p>
+                        <div class="flex items-center gap-2">
+                            <p class="font-display font-bold text-ink truncate">{{ profile.name }}</p>
+                            {% if passenger_category == 'VIP' %}
+                            <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">🌟 VIP</span>
+                            {% elif passenger_category == 'REGULAR' %}
+                            <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-800 border border-cyan-200">🚗 Regular</span>
+                            {% else %}
+                            <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">🚴 Newbie</span>
+                            {% endif %}
+                        </div>
                         <p class="text-xs text-muted">Passenger</p>
                     </div>
                 </div>
@@ -430,17 +439,24 @@
 
             <!-- Coupons -->
             <div class="bg-card rounded-xl border border-hairline shadow-softer p-6">
-                <h2 class="font-display font-bold text-lg text-ink mb-4">Available Coupons</h2>
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="font-display font-bold text-lg text-ink">Available Coupons</h2>
+                    <span class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-light text-emerald-dark">Targeted for You</span>
+                </div>
                 {% for coupon in coupons %}
                 <div
                         class="flex items-center justify-between gap-3 border border-dashed border-emerald-ring bg-emerald-light/40 rounded-lg px-4 py-3 {% if not forloop.last %}mb-3{% endif %}"
                 >
                     <div class="min-w-0">
-                        <p class="font-mono font-semibold text-sm text-emerald-dark tracking-wide truncate">{{
-                            coupon.code }}</p>
+                        <p class="font-mono font-semibold text-sm text-emerald-dark tracking-wide truncate">{{ coupon.code }}</p>
                         <p class="text-[11px] text-muted mt-0.5">Expires {{ coupon.expire_date|date:"d M, Y" }}</p>
                     </div>
-                    <span class="font-display font-bold text-emerald-dark shrink-0">{{ coupon.discount }}% OFF</span>
+                    <div class="text-right shrink-0">
+                        <span class="font-display font-bold text-emerald-dark block text-sm">{{ coupon.discount }}% OFF</span>
+                        {% if coupon.max_discount > 0 %}
+                        <span class="text-[10px] text-muted block">(Max ৳{{ coupon.max_discount }})</span>
+                        {% endif %}
+                    </div>
                 </div>
                 {% empty %}
                 <p class="text-sm text-muted text-center py-6">No coupons available right now.</p>
