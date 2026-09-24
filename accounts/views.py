@@ -164,7 +164,7 @@ def passenger_dashboard(request):
                               rr.requested_vehicle_type,
                               rr.requested_capacity,
                               d.name,
-                              rr.payment_method,
+                              LOWER(COALESCE(pay.payment_method, rr.payment_method)) AS payment_method,
                               pay.status AS payment_status,
                               rr.ride_id
                        FROM accounts_riderequest rr
@@ -237,11 +237,40 @@ def passenger_dashboard(request):
     return render(request, 'passenger/passenger-dashboard.html', context)
 
 
+# # key used in the frontend <-> what gets stored on RideRequest
+# VEHICLE_OPTIONS = {
+#     'bike': {'label': 'Bike', 'type': 'Bike', 'capacity': None, 'base': 20, 'per_km': 8, 'per_min': 0.5},
+#     'car4': {'label': 'Car (4-seat)', 'type': 'Car', 'capacity': 4, 'base': 50, 'per_km': 20, 'per_min': 1.0},
+#     'car8': {'label': 'Car (8-seat)', 'type': 'Car', 'capacity': 8, 'base': 80, 'per_km': 25, 'per_min': 1.5},
+# }
+
+
 # key used in the frontend <-> what gets stored on RideRequest
 VEHICLE_OPTIONS = {
-    'bike': {'label': 'Bike', 'type': 'Bike', 'capacity': None, 'base': 20, 'per_km': 8, 'per_min': 0.5},
-    'car4': {'label': 'Car (4-seat)', 'type': 'Car', 'capacity': 4, 'base': 50, 'per_km': 20, 'per_min': 1.0},
-    'car8': {'label': 'Car (8-seat)', 'type': 'Car', 'capacity': 8, 'base': 80, 'per_km': 25, 'per_min': 1.5},
+    'bike': {
+        'label': 'Bike',
+        'type': 'Bike',
+        'capacity': 1,
+        'base': 30,       # Base Fare (BDT)
+        'per_km': 12,     # Per Kilometer Rate
+        'per_min': 1.0    # Waiting / Time Rate Per Minute
+    },
+    'car4': {
+        'label': 'Car (4-seat)',
+        'type': 'Car',
+        'capacity': 4,
+        'base': 90,       # Base Fare
+        'per_km': 28,     # Per Kilometer Rate
+        'per_min': 2.5    # Per Minute Rate
+    },
+    'car8': {
+        'label': 'Car (8-seat)',
+        'type': 'Car',
+        'capacity': 8,
+        'base': 150,      # Base Fare
+        'per_km': 35,     # Per Kilometer Rate
+        'per_min': 3.5    # Per Minute Rate
+    },
 }
 
 
@@ -815,7 +844,8 @@ def nearby_rides(request):
                               end_location,
                               estimated_fare,
                               requested_vehicle_type,
-                              requested_capacity, time
+                              requested_capacity, time,
+                              payment_method
                        FROM accounts_riderequest
                        WHERE status = 'Pending' AND start_lat IS NOT NULL AND start_lng IS NOT NULL
                        """)
@@ -824,7 +854,7 @@ def nearby_rides(request):
     nearby = []
     for row in rows:
         (req_id, start_location, req_lat, req_lng, end_location,
-         fare, req_type, req_capacity, req_time) = row
+         fare, req_type, req_capacity, req_time, pm) = row
 
         # Only show requests this driver can actually fulfil
         if req_type != vehicle_type:
@@ -845,6 +875,7 @@ def nearby_rides(request):
             'capacity': req_capacity,
             'time': req_time.strftime('%I:%M %p') if req_time else '',
             'distance_km': round(distance, 1),
+            'payment_method': (pm or 'cash').lower(),
         })
 
     nearby.sort(key=lambda r: r['distance_km'])

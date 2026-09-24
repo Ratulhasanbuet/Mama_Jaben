@@ -350,7 +350,12 @@
         card.innerHTML = `
           <div class="flex items-start justify-between gap-4">
             <div class="min-w-0">
-              <span class="inline-block text-[11px] font-semibold text-emerald-dark bg-emerald-light px-2 py-0.5 rounded-full">${ride.distance_km} km away</span>
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="inline-block text-[11px] font-semibold text-emerald-dark bg-emerald-light px-2 py-0.5 rounded-full">${ride.distance_km} km away</span>
+                <span class="inline-block text-[11px] font-semibold ${ride.payment_method === 'online' ? 'text-purple-700 bg-purple-50 border border-purple-200' : 'text-amber-800 bg-amber-50 border border-amber-200'} px-2 py-0.5 rounded-full">
+                  ${ride.payment_method === 'online' ? '💳 Online' : '💵 Cash'}
+                </span>
+              </div>
               <div class="flex items-start gap-3 mt-3">
                 <div class="mt-1.5 flex flex-col items-center">
                   <span class="w-2 h-2 rounded-full bg-emerald shrink-0"></span>

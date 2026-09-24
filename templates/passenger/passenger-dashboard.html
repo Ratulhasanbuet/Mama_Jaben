@@ -187,8 +187,7 @@
                         <p class="text-sm font-medium text-ink truncate mt-2.5">{{ ride.end_location }}</p>
                         <p class="text-xs text-muted mt-1.5">
                             {{ ride.date|date:"d M, Y" }} · {{ ride.time|time:"g:i A" }}
-                            {% if ride.vehicle_type %} · {{ ride.vehicle_type }}{% if ride.capacity %} ({{ ride.capacity
-                            }}-seat){% endif %}{% endif %}
+                            {% if ride.vehicle_type %} · {{ ride.vehicle_type }}{% if ride.capacity %} ({{ ride.capacity }}-seat){% endif %}{% endif %}
                             {% if ride.driver_name %} · {{ ride.driver_name }}{% endif %}
                         </p>
                     </div>
@@ -203,14 +202,22 @@
                     >
                     {% if ride.is_paid %}
                     <div class="mt-1">
+                        {% if ride.payment_method == 'cash' %}
+                        <span class="inline-block text-[10px] font-semibold text-emerald-dark bg-emerald-light border border-emerald-ring px-2 py-0.5 rounded">💵 Paid via Cash</span>
+                        {% else %}
                         <span class="inline-block text-[10px] font-semibold text-emerald-dark bg-emerald-light border border-emerald-ring px-2 py-0.5 rounded">✓ Paid Online</span>
+                        {% endif %}
                     </div>
                     {% elif ride.status != 'Cancelled' %}
                     <div class="mt-1.5">
+                        {% if ride.payment_method == 'cash' %}
+                        <span class="inline-block text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">💵 Cash Payment</span>
+                        {% else %}
                         <a href="{% url 'initiate_passenger_payment' ride.request_id %}"
                            class="inline-block text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-2.5 py-1 rounded shadow-sm transition-colors">
                             Pay Online (SSL)
                         </a>
+                        {% endif %}
                     </div>
                     {% endif %}
                     {% if ride.status == 'Pending' or ride.status == 'Accepted' %}
