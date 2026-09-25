@@ -29,7 +29,7 @@ print(TEMPLATES_DIR)
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-(!)zpa+2y*x-q))ypduqo^ymc+484rp-(z&m1@&l@g3mo7_o#h'
+SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -155,6 +155,7 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 import os
 
 MEDIA_URL = '/media/'

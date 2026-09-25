@@ -178,8 +178,10 @@
                     class="mt-2 w-full sm:w-72 border border-hairline rounded-lg px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-ring">
                 <option value="">No coupon</option>
                 {% for coupon in coupons %}
-                <option value="{{ coupon.code }}" data-discount="{{ coupon.discount }}" data-max-discount="{{ coupon.max_discount }}">
-                    {{ coupon.code }} — {{ coupon.discount }}% OFF{% if coupon.max_discount > 0 %} (Max ৳{{ coupon.max_discount }}){% endif %}
+                <option value="{{ coupon.code }}" data-discount="{{ coupon.discount }}"
+                        data-max-discount="{{ coupon.max_discount }}">
+                    {{ coupon.code }} — {{ coupon.discount }}% OFF{% if coupon.max_discount > 0 %} (Max ৳{{
+                    coupon.max_discount }}){% endif %}
                 </option>
                 {% endfor %}
             </select>
@@ -448,19 +450,66 @@
         }
     }
 
-    function drawRouteLine() {
-        if (routePolyline) map.removeLayer(routePolyline);
-        if (!(pickupLatLng && destLatLng)) return;
-        routePolyline = L.polyline([
-            [pickupLatLng.lat, pickupLatLng.lng],
-            [destLatLng.lat, destLatLng.lng]
-        ], {
-            color: '#0E7A5A',
-            weight: 4,
-            dashArray: '8, 8',
-            opacity: 0.8
-        }).addTo(map);
+    async function drawRouteLine() {
+    if (routePolyline) {
+        map.removeLayer(routePolyline);
+        routePolyline = null;
     }
+
+    if (!(pickupLatLng && destLatLng)) return;
+
+    const coordinates =
+        `${pickupLatLng.lng},${pickupLatLng.lat};` +
+        `${destLatLng.lng},${destLatLng.lat}`;
+
+    const osrmUrl =
+        `https://router.project-osrm.org/route/v1/driving/${coordinates}` +
+        `?overview=full&geometries=geojson`;
+
+    try {
+        const response = await fetch(osrmUrl);
+
+        if (!response.ok) {
+            throw new Error("OSRM request failed");
+        }
+
+        const data = await response.json();
+
+        if (data.code !== "Ok" || !data.routes?.length) {
+            throw new Error("No route found");
+        }
+
+        const route = data.routes[0];
+
+        routePolyline = L.geoJSON(route.geometry, {
+            style: {
+                color: "#0E7A5A",
+                weight: 5,
+                opacity: 0.85
+            }
+        }).addTo(map);
+
+        map.fitBounds(
+            routePolyline.getBounds(),
+            {padding: [50, 50]}
+        );
+
+        console.log(
+            "Road distance:",
+            (route.distance / 1000).toFixed(2),
+            "km"
+        );
+
+        console.log(
+            "Road duration:",
+            Math.round(route.duration / 60),
+            "minutes"
+        );
+
+    } catch (error) {
+        console.error("OSRM route error:", error);
+    }
+}
 
     function useCurrentLocation() {
         if (!navigator.geolocation) return;
@@ -763,7 +812,8 @@
                 dest_lat: destLatLng.lat,
                 dest_lng: destLatLng.lng,
                 end_location: document.getElementById('dest-input').value,
-                payment_method: document.getElementById('field-payment-method').value
+                payment_method: document.getElementById('field-payment-method').value,
+                coupon_code: document.getElementById('field-coupon-code').value || null
             }),
         })
             .then(res => res.json())
@@ -795,8 +845,7 @@
                 alert('Something went wrong. Please try again.');
             });
     }
-
-    ````
+````
 </script>
 </body>
 
